@@ -84,6 +84,29 @@
           this.createSensoryBubbles();
           this.createWallSpotifyPlayer();
           this.createWallControlAndSwitches();
+          this.createSketchfabSofa();
+        }
+
+        async createSketchfabSofa() {
+          const sofa = new xb.ModelViewer({});
+          this.add(sofa);
+          try {
+            await sofa.loadGLTFModel({
+              data: {
+                path: 'https://cdn.jsdelivr.net/gh/aine100/vr-sensory-room@main/',
+                model: 'sofa.glb',
+                scale: { x: 1.0, y: 1.0, z: 1.0 },
+                rotation: { x: 0, y: 0, z: 0 }
+              },
+              renderer: xb.core.renderer,
+            });
+            sofa.position.set(0, 0, -1.8);
+            sofa.castShadow = true;
+            sofa.receiveShadow = true;
+            console.log('Custom Sketchfab sofa loaded successfully!');
+          } catch (e) {
+            console.warn('Failed to load custom sofa model:', e);
+          }
         }
 
         createRoomEnvironment() {
@@ -224,26 +247,7 @@
           frameMesh.rotation.y = -Math.PI / 2;
           this.add(frameMesh);
 
-          // Cozy Seating Cushions
-          const cushionGeo = new THREE.BoxGeometry(1.0, 0.4, 1.0);
-          const cushionMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.8 });
-          
-          const cushion1 = new THREE.Mesh(cushionGeo, cushionMat);
-          cushion1.position.set(-1.5, 0.2, -1.0);
-          cushion1.castShadow = true;
-          this.add(cushion1);
-
-          const cushion2 = new THREE.Mesh(cushionGeo, cushionMat);
-          cushion2.position.set(1.5, 0.2, -1.0);
-          cushion2.castShadow = true;
-          this.add(cushion2);
-
-          const cushion3 = new THREE.Mesh(cushionGeo, cushionMat);
-          cushion3.position.set(0, 0.2, -2.0);
-          cushion3.castShadow = true;
-          this.add(cushion3);
-
-          // Taylor Swift Poster using taylor1.jpg
+          // Taylor Swift Eras Tour Poster with robust fallback
           const posterGeo = new THREE.PlaneGeometry(1.5, 2.1);
           const posterMat = new THREE.MeshStandardMaterial({ roughness: 0.2 });
           const posterMesh = new THREE.Mesh(posterGeo, posterMat);
@@ -253,10 +257,34 @@
           this.add(posterMesh);
 
           const textureLoader = new THREE.TextureLoader();
-          textureLoader.load('taylor1.jpg', (tex) => {
-            posterMat.map = tex;
-            posterMat.needsUpdate = true;
-          });
+          textureLoader.load(
+            'taylor1.jpg',
+            (tex) => {
+              posterMat.map = tex;
+              posterMat.needsUpdate = true;
+            },
+            undefined,
+            () => {
+              const fallbackCanvas = document.createElement('canvas');
+              fallbackCanvas.width = 600;
+              fallbackCanvas.height = 840;
+              const fCtx = fallbackCanvas.getContext('2d');
+              fCtx.fillStyle = '#ffffff';
+              fCtx.fillRect(0, 0, 600, 840);
+              fCtx.fillStyle = '#0f172a';
+              fCtx.fillRect(20, 20, 560, 560);
+              fCtx.fillStyle = '#fce7f3';
+              fCtx.font = 'bold 40px Inter, sans-serif';
+              fCtx.textAlign = 'center';
+              fCtx.fillText('TAYLOR SWIFT', 300, 290);
+              fCtx.font = 'bold 28px Inter, sans-serif';
+              fCtx.fillText('THE ERAS TOUR', 300, 340);
+              
+              const fallbackTex = new THREE.CanvasTexture(fallbackCanvas);
+              posterMat.map = fallbackTex;
+              posterMat.needsUpdate = true;
+            }
+          );
         }
 
         createWallSpotifyPlayer() {
