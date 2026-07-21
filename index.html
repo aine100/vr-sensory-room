@@ -46,31 +46,63 @@
           // State Variables
           this.currentThemeIndex = 0;
           this.bubbleSpeedMultiplier = 1.0;
-          this.lightIntensity = 0.375; // Restored original full light influence
+          this.lightIntensity = 0.375;
           this.bubblesActive = true;
           this.lampsActive = true;
 
-          // Object Collections for Interactivity and Collision
+          // Object Collections for Interactivity and Repositioning
           this.movableObjects = [];
           this.grabbedObject = null;
           this.grabController = null;
-          this.grabOffset = new THREE.Vector3();
+          this.raycaster = new THREE.Raycaster();
+          this.mouse = new THREE.Vector2();
 
           // Room Dimensions
           this.roomWidth = 10;
           this.roomHeight = 4;
           this.roomDepth = 10;
 
-          // Locomotion and turning state
+          // Locomotion and Turning State
           this.moveVelocity = new THREE.Vector3();
           this.keys = { w: false, a: false, s: false, d: false, q: false, e: false, arrowLeft: false, arrowRight: false };
 
-          // Audio state
+          // Audio & Spotify State
           this.audioCtx = null;
           this.isPlayingAudio = false;
-          this.synthNodes = null;
+          this.spotifyLoggedIn = false;
+          this.currentAlbumIndex = 0;
+          
+          this.albums = [
+            { 
+              name: "Midnights (The Til Dawn Edition)", 
+              artist: "Taylor Swift", 
+              cover: "https://placehold.co/300x300/1e1b4b/e2e8f0?text=Midnights+(Til+Dawn)",
+              tracks: ["Lavender Haze", "Anti-Hero", "Midnight Rain", "You're On Your Own, Kid", "Karma", "Snow On The Beach"]
+            },
+            { 
+              name: "1989 (Taylor's Version)", 
+              artist: "Taylor Swift", 
+              cover: "https://placehold.co/38bdf8/0f172a?text=1989+(TV)",
+              tracks: ["Style (TV)", "Blank Space (TV)", "Shake It Off (TV)", "Bad Blood (TV)"]
+            },
+            { 
+              name: "Folklore", 
+              artist: "Taylor Swift", 
+              cover: "https://placehold.co/64748b/f8fafc?text=Folklore",
+              tracks: ["cardigan", "exile", "august", "the last great american dynasty"]
+            }
+          ];
 
-          // Expanded color themes for rich environmental mood selection
+          // YouTube Premium State
+          this.youtubeLoggedIn = false;
+          this.currentVideoIndex = 0;
+          this.youtubeVideos = [
+            { title: "Relaxing Nature & Ocean Waves 4K", url: "https://cdn.jsdelivr.net/gh/xrblocks/assets@main/videos/duck_swimming_veo.mp4" },
+            { title: "Lofi Hip Hop Radio - Beats to Relax/Study", url: "https://cdn.jsdelivr.net/gh/xrblocks/assets@main/videos/duck_swimming_veo.mp4" },
+            { title: "Cosmic Space Ambient Journey", url: "https://cdn.jsdelivr.net/gh/xrblocks/assets@main/videos/duck_swimming_veo.mp4" }
+          ];
+
+          // Expanded color themes
           this.themes = [
             { name: 'Ocean Calm', color: 0x142850, lightColor: 0x63b3ed, bubbleColor: 0x4299e1 },
             { name: 'Forest Serenity', color: 0x123524, lightColor: 0x68d391, bubbleColor: 0x48bb78 },
@@ -82,6 +114,8 @@
 
           this.handleKeyDown = this.handleKeyDown.bind(this);
           this.handleKeyUp = this.handleKeyUp.bind(this);
+          this.handlePointerDown = this.handlePointerDown.bind(this);
+          this.handlePointerUp = this.handlePointerUp.bind(this);
         }
 
         async init() {
@@ -91,11 +125,13 @@
 
           window.addEventListener('keydown', this.handleKeyDown);
           window.addEventListener('keyup', this.handleKeyUp);
+          window.addEventListener('pointerdown', this.handlePointerDown);
+          window.addEventListener('pointerup', this.handlePointerUp);
 
           this.ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
           this.add(this.ambientLight);
 
-          this.directionalLight = new THREE.DirectionalLight(0x63b3ed, this.lightIntensity);
+          this.directionalLight = new THREE.DirectionalLight(0x63b3ed, 1.2);
           this.directionalLight.position.set(0, 6, 3);
           this.directionalLight.castShadow = true;
           this.add(this.directionalLight);
@@ -103,8 +139,8 @@
           this.createRoomEnvironment();
           this.createSensoryBubbles();
           this.createWallSpotifyPlayer();
+          this.createWallYouTubePlayer();
           this.createWallControlAndSwitches();
-          this.createTaylorPoster();
           this.createOvalTableAndLavaLamp();
 
           this.setTheme(0);
@@ -130,6 +166,31 @@
           if (e.key === 'e' || e.key === 'E') this.keys.e = false;
           if (e.key === 'ArrowLeft') this.keys.arrowLeft = false;
           if (e.key === 'ArrowRight') this.keys.arrowRight = false;
+        }
+
+        handlePointerDown(e) {
+          this.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+          this.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+          this.raycaster.setFromCamera(this.mouse, xb.core.camera);
+          
+          const intersects = this.raycaster.intersectObjects(this.movableObjects, true);
+          if (intersects.length > 0) {
+            let obj = intersects[0].object;
+            while (obj.parent && !this.movableObjects.includes(obj)) {
+              obj = obj.parent;
+            }
+            if (this.movableObjects.includes(obj)) {
+              this.grabbedObject = obj;
+              this.grabController = 'desktop';
+            }
+          }
+        }
+
+        handlePointerUp(e) {
+          if (this.grabbedObject && this.grabController === 'desktop') {
+            this.grabbedObject = null;
+            this.grabController = null;
+          }
         }
 
         createRoomEnvironment() {
@@ -158,6 +219,7 @@
           floor.receiveShadow = true;
           this.add(floor);
 
+          // Standing Lamps
           const lampPoleGeo = new THREE.CylinderGeometry(0.03, 0.03, 3.2, 16);
           const lampMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.2 });
           const shadeGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.8, 32, 1, true);
@@ -171,6 +233,7 @@
           shade1.position.y = 2.8;
           lampGroup1.add(shade1);
           lampGroup1.position.set(-4.0, 0, 4.0);
+          lampGroup1.userData = { name: "Standing Lamp Left", radius: 0.4 };
           this.add(lampGroup1);
           this.movableObjects.push(lampGroup1);
 
@@ -182,34 +245,494 @@
           shade2.position.y = 2.8;
           lampGroup2.add(shade2);
           lampGroup2.position.set(4.0, 0, 4.0);
+          lampGroup2.userData = { name: "Standing Lamp Right", radius: 0.4 };
           this.add(lampGroup2);
           this.movableObjects.push(lampGroup2);
 
-          this.warmLight1 = new THREE.PointLight(0xfef08a, 0.8, 8);
+          this.warmLight1 = new THREE.PointLight(0xfef08a, 1.5, 10);
           this.warmLight1.position.set(-4.0, 2.8, 4.0);
           this.warmLight1.castShadow = true;
           this.add(this.warmLight1);
 
-          this.warmLight2 = new THREE.PointLight(0xfef08a, 0.8, 8);
+          this.warmLight2 = new THREE.PointLight(0xfef08a, 1.5, 10);
           this.warmLight2.position.set(4.0, 2.8, 4.0);
           this.warmLight2.castShadow = true;
           this.add(this.warmLight2);
 
           this.lampLightList = [this.warmLight1, this.warmLight2];
         }
-<!-- ... existing code ... %>
-          this.lavaLight = new THREE.PointLight(0x4299e1, 0.4, 3);
+
+        createSensoryBubbles() {
+          this.bubbles = [];
+          const bubbleGeo = new THREE.SphereGeometry(1, 32, 32);
+          const numBubbles = 40;
+          let attempts = 0;
+
+          while (this.bubbles.length < numBubbles && attempts < 800) {
+            attempts++;
+            const rx = (Math.random() - 0.5) * 8.0;
+            const rz = (Math.random() - 0.5) * 8.0;
+            const ry = Math.random() * 3.5 + 0.3;
+
+            let tooClose = false;
+            for (let b of this.bubbles) {
+              const dx = b.position.x - rx;
+              const dz = b.position.z - rz;
+              if (Math.sqrt(dx * dx + dz * dz) < 1.2) {
+                tooClose = true;
+                break;
+              }
+            }
+
+            if (!tooClose) {
+              const scale = Math.random() * 0.12 + 0.05;
+              const bubbleMat = new THREE.MeshPhysicalMaterial({
+                color: 0x4299e1,
+                transmission: 0.9,
+                opacity: 1,
+                transparent: true,
+                roughness: 0.1,
+                ior: 1.2,
+                thickness: 0.5
+              });
+              const bubble = new THREE.Mesh(bubbleGeo, bubbleMat);
+              bubble.scale.set(scale, scale, scale);
+              bubble.position.set(rx, ry, rz);
+              bubble.userData = {
+                baseY: ry,
+                speed: Math.random() * 0.8 + 0.4,
+                wobbleSpeed: Math.random() * 2 + 1,
+                wobbleOffset: Math.random() * Math.PI * 2
+              };
+              this.add(bubble);
+              this.bubbles.push(bubble);
+            }
+          }
+        }
+
+        createWallSpotifyPlayer() {
+          this.spotifyPanel = new xb.SpatialPanel({
+            width: 2.2,
+            height: 1.4,
+            backgroundColor: '#0f172afc'
+          });
+          this.spotifyPanel.position.set(0.0, 2.0, -4.9);
+          this.add(this.spotifyPanel);
+
+          const grid = this.spotifyPanel.addGrid();
+          
+          const headerRow = grid.addRow({ weight: 0.15 });
+          headerRow.addText({ text: "🎵 Spotify Premium Hub - Midnights (Til Dawn)", fontColor: '#38bdf8', fontSize: 0.06 });
+
+          const mainContentRow = grid.addRow({ weight: 0.65 });
+          
+          const leftCol = mainContentRow.addCol({ weight: 0.5 });
+          const infoGrid = leftCol.addGrid();
+          
+          this.albumArtImage = infoGrid.addRow({ weight: 0.75 }).addImage({
+            src: this.albums[this.currentAlbumIndex].cover,
+            paddingX: 0.05,
+            paddingY: 0.05
+          });
+          
+          this.trackLabel = infoGrid.addRow({ weight: 0.25 }).addText({
+            text: `${this.albums[this.currentAlbumIndex].name} - ${this.albums[this.currentAlbumIndex].tracks[0]}`,
+            fontColor: '#ffffff',
+            fontSize: 0.045
+          });
+
+          const rightCol = mainContentRow.addCol({ weight: 0.5 });
+          const controlGrid = rightCol.addGrid();
+
+          this.loginButton = controlGrid.addRow({ weight: 0.3 }).addTextButton({
+            text: "🔑 Connect Spotify Premium",
+            backgroundColor: '#1db954',
+            fontColor: '#ffffff',
+            fontSize: 0.16
+          });
+          this.loginButton.onTriggered = () => {
+            this.spotifyLoggedIn = !this.spotifyLoggedIn;
+            this.loginButton.setText(this.spotifyLoggedIn ? "✅ Connected (Premium)" : "🔑 Connect Spotify Premium");
+            this.statusText.setText(this.spotifyLoggedIn ? "Spotify Premium Account Linked!" : "Logged Out");
+          };
+
+          const albumBrowseRow = controlGrid.addRow({ weight: 0.3 });
+          const prevAlbumBtn = albumBrowseRow.addCol({ weight: 0.5 }).addTextButton({
+            text: "◀ Prev Album",
+            backgroundColor: '#334155',
+            fontColor: '#ffffff',
+            fontSize: 0.15
+          });
+          prevAlbumBtn.onTriggered = () => {
+            this.currentAlbumIndex = (this.currentAlbumIndex - 1 + this.albums.length) % this.albums.length;
+            this.updateAlbumDisplay();
+          };
+
+          const nextAlbumBtn = albumBrowseRow.addCol({ weight: 0.5 }).addTextButton({
+            text: "Next Album ▶",
+            backgroundColor: '#334155',
+            fontColor: '#ffffff',
+            fontSize: 0.15
+          });
+          nextAlbumBtn.onTriggered = () => {
+            this.currentAlbumIndex = (this.currentAlbumIndex + 1) % this.albums.length;
+            this.updateAlbumDisplay();
+          };
+
+          this.statusText = controlGrid.addRow({ weight: 0.4 }).addText({
+            text: "Select album & click TV to play",
+            fontColor: '#94a3b8',
+            fontSize: 0.04
+          });
+
+          const footerRow = grid.addRow({ weight: 0.2 });
+          const playBtn = footerRow.addCol({ weight: 1.0 }).addTextButton({
+            text: "▶ Play / Pause Ambient Soundscape (Click TV Too)",
+            backgroundColor: '#0284c7',
+            fontColor: '#ffffff',
+            fontSize: 0.14
+          });
+          playBtn.onTriggered = () => {
+            this.toggleAudio();
+          };
+
+          this.spotifyPanel.updateLayouts();
+        }
+
+        updateAlbumDisplay() {
+          const album = this.albums[this.currentAlbumIndex];
+          this.albumArtImage.load(album.cover);
+          this.trackLabel.setText(`${album.name} - ${album.tracks[0]}`);
+          this.statusText.setText(`Loaded: ${album.artist}`);
+        }
+
+        createWallYouTubePlayer() {
+          this.youtubePanel = new xb.SpatialPanel({
+            width: 2.2,
+            height: 1.4,
+            backgroundColor: '#1e1b2bfc'
+          });
+          this.youtubePanel.position.set(4.9, 1.8, 0.0);
+          this.youtubePanel.rotation.y = -Math.PI / 2;
+          this.add(this.youtubePanel);
+
+          const grid = this.youtubePanel.addGrid();
+
+          const headerRow = grid.addRow({ weight: 0.15 });
+          headerRow.addText({ text: "▶️ YouTube Premium Hub", fontColor: '#ef4444', fontSize: 0.06 });
+
+          const mainContentRow = grid.addRow({ weight: 0.65 });
+
+          const leftCol = mainContentRow.addCol({ weight: 0.5 });
+          const infoGrid = leftCol.addGrid();
+
+          this.youtubeVideoView = infoGrid.addRow({ weight: 0.75 }).addVideo();
+          this.youtubeVideoView.load({ src: this.youtubeVideos[this.currentVideoIndex].url });
+
+          this.youtubeTrackLabel = infoGrid.addRow({ weight: 0.25 }).addText({
+            text: this.youtubeVideos[this.currentVideoIndex].title,
+            fontColor: '#ffffff',
+            fontSize: 0.04
+          });
+
+          const rightCol = mainContentRow.addCol({ weight: 0.5 });
+          const controlGrid = rightCol.addGrid();
+
+          this.ytLoginButton = controlGrid.addRow({ weight: 0.3 }).addTextButton({
+            text: "🔑 Connect YouTube Premium",
+            backgroundColor: '#dc2626',
+            fontColor: '#ffffff',
+            fontSize: 0.15
+          });
+          this.ytLoginButton.onTriggered = () => {
+            this.youtubeLoggedIn = !this.youtubeLoggedIn;
+            this.ytLoginButton.setText(this.youtubeLoggedIn ? "✅ YT Premium Active" : "🔑 Connect YouTube Premium");
+            this.ytStatusText.setText(this.youtubeLoggedIn ? "YouTube Premium Account Linked!" : "Logged Out");
+          };
+
+          const videoBrowseRow = controlGrid.addRow({ weight: 0.3 });
+          const prevVideoBtn = videoBrowseRow.addCol({ weight: 0.5 }).addTextButton({
+            text: "◀ Prev Video",
+            backgroundColor: '#334155',
+            fontColor: '#ffffff',
+            fontSize: 0.15
+          });
+          prevVideoBtn.onTriggered = () => {
+            this.currentVideoIndex = (this.currentVideoIndex - 1 + this.youtubeVideos.length) % this.youtubeVideos.length;
+            this.updateYouTubeDisplay();
+          };
+
+          const nextVideoBtn = videoBrowseRow.addCol({ weight: 0.5 }).addTextButton({
+            text: "Next Video ▶",
+            backgroundColor: '#334155',
+            fontColor: '#ffffff',
+            fontSize: 0.15
+          });
+          nextVideoBtn.onTriggered = () => {
+            this.currentVideoIndex = (this.currentVideoIndex + 1) % this.youtubeVideos.length;
+            this.updateYouTubeDisplay();
+          };
+
+          this.ytStatusText = controlGrid.addRow({ weight: 0.4 }).addText({
+            text: "Browse playlists & watch in 3D",
+            fontColor: '#94a3b8',
+            fontSize: 0.04
+          });
+
+          const footerRow = grid.addRow({ weight: 0.2 });
+          const ytPlayBtn = footerRow.addCol({ weight: 1.0 }).addTextButton({
+            text: "▶ Play / Pause YouTube Stream",
+            backgroundColor: '#b91c1c',
+            fontColor: '#ffffff',
+            fontSize: 0.14
+          });
+          ytPlayBtn.onTriggered = () => {
+            this.ytStatusText.setText(this.youtubeLoggedIn ? "Streaming YouTube Content..." : "Please Connect YT Premium First");
+          };
+
+          this.youtubePanel.updateLayouts();
+        }
+
+        updateYouTubeDisplay() {
+          const video = this.youtubeVideos[this.currentVideoIndex];
+          this.youtubeVideoView.load({ src: video.url });
+          this.youtubeTrackLabel.setText(video.title);
+          this.ytStatusText.setText(`Loaded: ${video.title}`);
+        }
+
+        createWallControlAndSwitches() {
+          this.ctrlPanel = new xb.SpatialPanel({
+            width: 1.2,
+            height: 1.4,
+            backgroundColor: '#1e293bf8'
+          });
+          this.ctrlPanel.position.set(-4.9, 1.8, 0.0);
+          this.ctrlPanel.rotation.y = Math.PI / 2;
+          this.add(this.ctrlPanel);
+
+          const grid = this.ctrlPanel.addGrid();
+          grid.addRow({ weight: 0.15 }).addText({ text: "🎛️ Room Controls", fontColor: '#38bdf8', fontSize: 0.07 });
+
+          const themeBtn = grid.addRow({ weight: 0.2 }).addTextButton({
+            text: "🎨 Cycle Theme",
+            backgroundColor: '#475569',
+            fontColor: '#ffffff',
+            fontSize: 0.18
+          });
+          themeBtn.onTriggered = () => {
+            this.currentThemeIndex = (this.currentThemeIndex + 1) % this.themes.length;
+            this.setTheme(this.currentThemeIndex);
+          };
+
+          const bubbleBtn = grid.addRow({ weight: 0.2 }).addTextButton({
+            text: "🫧 Toggle Bubbles",
+            backgroundColor: '#475569',
+            fontColor: '#ffffff',
+            fontSize: 0.18
+          });
+          bubbleBtn.onTriggered = () => {
+            this.bubblesActive = !this.bubblesActive;
+            for (let b of this.bubbles) b.visible = this.bubblesActive;
+          };
+
+          const lightBtn = grid.addRow({ weight: 0.2 }).addTextButton({
+            text: "💡 Cycle Light Intensity",
+            backgroundColor: '#475569',
+            fontColor: '#ffffff',
+            fontSize: 0.18
+          });
+          lightBtn.onTriggered = () => {
+            this.cycleLightIntensity();
+          };
+
+          const lampToggleBtn = grid.addRow({ weight: 0.2 }).addTextButton({
+            text: "🛋️ Toggle Lamps On/Off",
+            backgroundColor: '#0284c7',
+            fontColor: '#ffffff',
+            fontSize: 0.18
+          });
+          lampToggleBtn.onTriggered = () => {
+            this.lampsActive = !this.lampsActive;
+            for (let l of this.lampLightList) l.intensity = this.lampsActive ? 1.5 : 0.0;
+          };
+
+          this.ctrlPanel.updateLayouts();
+        }
+
+        createOvalTableAndLavaLamp() {
+          const tableGroup = new THREE.Group();
+          const tableTopGeo = new THREE.CylinderGeometry(0.7, 0.7, 0.06, 32);
+          tableTopGeo.scale(1.4, 1, 0.8);
+          const tableMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.3 });
+          const tableTop = new THREE.Mesh(tableTopGeo, tableMat);
+          tableTop.position.y = 0.45;
+          tableTop.castShadow = true;
+          tableTop.receiveShadow = true;
+          tableGroup.add(tableTop);
+
+          const legGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.45, 16);
+          const legMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.8 });
+          
+          for (let coords of [[-0.7, -0.3], [0.7, -0.3], [-0.7, 0.3], [0.7, 0.3]]) {
+            const leg = new THREE.Mesh(legGeo, legMat);
+            leg.position.set(coords[0], 0.225, coords[1]);
+            leg.castShadow = true;
+            tableGroup.add(leg);
+          }
+
+          tableGroup.position.set(0.0, 0.0, -1.5);
+          tableGroup.userData = { name: "Oval Coffee Table", radius: 0.8 };
+          this.add(tableGroup);
+          this.movableObjects.push(tableGroup);
+
+          this.lavaGroup = new THREE.Group();
+          const baseGeo = new THREE.CylinderGeometry(0.08, 0.1, 0.12, 16);
+          const glassGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.35, 16);
+          const metalMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9 });
+          
+          const base = new THREE.Mesh(baseGeo, metalMat);
+          base.position.y = 0.06;
+          this.lavaGroup.add(base);
+
+          const glassMat = new THREE.MeshPhysicalMaterial({ color: 0xf43f5e, transmission: 0.6, transparent: true, opacity: 0.8 });
+          const glass = new THREE.Mesh(glassGeo, glassMat);
+          glass.position.y = 0.3;
+          this.lavaGroup.add(glass);
+
+          this.lavaLight = new THREE.PointLight(0xf43f5e, 1.5, 4);
           this.lavaLight.position.y = 0.3;
           this.lavaGroup.add(this.lavaLight);
           this.lampLightList.push(this.lavaLight);
 
-          this.lavaGroup.position.set(0.0, 0.475, 0); 
-          this.tableGroup.add(this.lavaGroup);
+          this.lavaGroup.position.set(0.0, 0.48, 0);
+          tableGroup.add(this.lavaGroup);
         }
-<!-- ... existing code ... %>
+
+        setTheme(index) {
+          const theme = this.themes[index];
+          if (this.roomMesh) {
+            this.roomMesh.material.color.setHex(theme.color);
+          }
+          if (this.directionalLight) {
+            this.directionalLight.color.setHex(theme.lightColor);
+          }
+          for (let b of this.bubbles) {
+            b.material.color.setHex(theme.bubbleColor);
+          }
+        }
+
         cycleLightIntensity() {
-          this.lightIntensity = this.lightIntensity === 0.375 ? 0.55 : 
-                                this.lightIntensity === 0.55 ? 0.75 : 0.375;
-          this.directionalLight.intensity = this.lightIntensity;
+          this.lightIntensity = this.lightIntensity === 0.375 ? 0.65 : 
+                                this.lightIntensity === 0.65 ? 1.00 : 0.375;
+          this.directionalLight.intensity = this.lightIntensity * 1.5;
         }
-<!-- ... existing code ... %>
+
+        toggleAudio() {
+          if (!this.audioCtx) {
+            this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          }
+          if (this.audioCtx.state === 'suspended') {
+            this.audioCtx.resume();
+          }
+
+          if (this.isPlayingAudio) {
+            if (this.oscillator) {
+              this.oscillator.stop();
+              this.oscillator.disconnect();
+            }
+            if (this.gainNode) {
+              this.gainNode.disconnect();
+            }
+            this.isPlayingAudio = false;
+          } else {
+            this.oscillator = this.audioCtx.createOscillator();
+            this.gainNode = this.audioCtx.createGain();
+
+            this.oscillator.type = 'sine';
+            this.oscillator.frequency.setValueAtTime(220, this.audioCtx.currentTime);
+
+            this.gainNode.gain.setValueAtTime(0.2, this.audioCtx.currentTime);
+
+            this.oscillator.connect(this.gainNode);
+            this.gainNode.connect(this.audioCtx.destination);
+
+            this.oscillator.start();
+            this.isPlayingAudio = true;
+          }
+        }
+
+        update() {
+          const delta = xb.getDeltaTime ? xb.getDeltaTime() : 0.016;
+          const time = performance.now() * 0.001;
+
+          for (let b of this.bubbles) {
+            b.position.y += Math.sin(time * b.userData.wobbleSpeed + b.userData.wobbleOffset) * 0.003 * this.bubbleSpeedMultiplier;
+            b.position.x += Math.cos(time * 0.5 + b.userData.wobbleOffset) * 0.001;
+            if (b.position.y > 3.8) {
+              b.position.y = 0.2;
+            }
+          }
+
+          if (this.grabbedObject && this.grabController === 'desktop') {
+            this.raycaster.setFromCamera(this.mouse, xb.core.camera);
+            const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+            const targetPos = new THREE.Vector3();
+            this.raycaster.ray.intersectPlane(plane, targetPos);
+            if (targetPos) {
+              this.grabbedObject.position.x = Math.max(-4, Math.min(4, targetPos.x));
+              this.grabbedObject.position.z = Math.max(-4, Math.min(4, targetPos.z));
+            }
+          }
+
+          const cam = xb.core.camera;
+          const moveSpeed = 2.5 * delta;
+          const turnSpeed = 1.5 * delta;
+
+          if (this.keys.arrowLeft || this.keys.q) {
+            cam.rotation.y += turnSpeed;
+          }
+          if (this.keys.arrowRight || this.keys.e) {
+            cam.rotation.y -= turnSpeed;
+          }
+
+          const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), cam.rotation.y);
+          const right = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), cam.rotation.y);
+
+          const nextPos = cam.position.clone();
+          if (this.keys.w) nextPos.addScaledVector(forward, moveSpeed);
+          if (this.keys.s) nextPos.addScaledVector(forward, -moveSpeed);
+          if (this.keys.a) nextPos.addScaledVector(right, -moveSpeed);
+          if (this.keys.d) nextPos.addScaledVector(right, moveSpeed);
+
+          let colliding = false;
+          const playerRadius = 0.3;
+          
+          if (nextPos.x < -4.5 || nextPos.x > 4.5 || nextPos.z < -4.5 || nextPos.z > 4.5) {
+            colliding = true;
+          }
+
+          for (let obj of this.movableObjects) {
+            const rad = obj.userData.radius || 0.5;
+            const dx = nextPos.x - obj.position.x;
+            const dz = nextPos.z - obj.position.z;
+            if (Math.sqrt(dx * dx + dz * dz) < (playerRadius + rad)) {
+              colliding = true;
+              break;
+            }
+          }
+
+          if (!colliding) {
+            cam.position.copy(nextPos);
+          }
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', function () {
+        const options = new xb.Options();
+        options.enableUI();
+        xb.add(new SensoryRoomScript());
+        xb.init(options);
+      });
+    </script>
+  </body>
+</html>
