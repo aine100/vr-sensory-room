@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>Customizable VR Sensory Room with Spotify & YouTube Music</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <link type="text/css" rel="stylesheet" href="https://xrblocks.github.io/css/xr.css" />
+    <script>
+      window.litDisableBundleWarning = true;
+    </script>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.184.0/build/three.module.js",
+          "three/": "https://cdn.jsdelivr.net/npm/three@0.184.0/",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.184.0/examples/jsm/",
+          "troika-three-text": "https://cdn.jsdelivr.net/gh/protectwise/troika@028b81cf308f0f22e5aa8e78196be56ec1997af5/packages/troika-three-text/src/index.js",
+          "troika-three-utils": "https://cdn.jsdelivr.net/gh/protectwise/troika@v0.52.4/packages/troika-three-utils/src/index.js",
+          "troika-worker-utils": "https://cdn.jsdelivr.net/gh/protectwise/troika@v0.52.4/packages/troika-worker-utils/src/index.js",
+          "bidi-js": "https://esm.sh/bidi-js@%5E1.0.2?target=es2022",
+          "webgl-sdf-generator": "https://esm.sh/webgl-sdf-generator@1.1.1/es2022/webgl-sdf-generator.mjs",
+          "@pmndrs/uikit": "https://cdn.jsdelivr.net/npm/@pmndrs/uikit@1.0.56/dist/index.min.js",
+          "@pmndrs/uikit-pub-sub": "https://cdn.jsdelivr.net/npm/@pmndrs/uikit-pub-sub@1.0.56/dist/index.min.js",
+          "@pmndrs/msdfonts": "https://cdn.jsdelivr.net/npm/@pmndrs/msdfonts@1.0.56/dist/index.min.js",
+          "@preact/signals-core": "https://cdn.jsdelivr.net/npm/@preact/signals-core@1.12.1/dist/signals-core.mjs",
+          "yoga-layout/load": "https://cdn.jsdelivr.net/npm/yoga-layout@3.2.1/dist/src/load.js",
+          "uiblocks": "https://cdn.jsdelivr.net/npm/xrblocks@0.16.0/build/addons/uiblocks/src/index.js",
+          "xrblocks": "https://cdn.jsdelivr.net/npm/xrblocks@0.16.0/build/xrblocks.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <script type="module">
+      import * as uikit from '@pmndrs/uikit';
+      import * as THREE from 'three';
+      import {
+        UICore,
+        UIPanel,
+        UIText,
+        UIImage,
+        UIIcon,
+        ManipulationBehavior,
+        raycastSortFunction,
+      } from 'uiblocks';
+      import * as xb from 'xrblocks';
+
+      class MultiPlatformSensoryRoomScript extends xb.Script {
+        constructor() {
+          super();
+          this.uiCore = new UICore(this);
+          this.ambientLight = null;
+          this.directionalLight = null;
+          this.bubbleParticles = null;
+          
+          this.currentThemeIndex = 0;
+          this.bubbleSpeedMultiplier = 1.0;
+          this.lightIntensity = 2.0;
+          this.isBreathingActive = false;
+          this.breathingPhase = 0;
+          this.isMusicPlaying = false;
+          this.sound = null;
+          this.audioListener = null;
+
+          this.themes = [
+            { name: 'Ocean Calm', color: 0x1a365d, lightColor: 0x63b3ed, bubbleColor: 0x4299e1 },
+            { name: 'Forest Serenity', color: 0x1c4532, lightColor: 0x68d391, bubbleColor: 0x48bb78 },
+            { name: 'Lavender Dreams', color: 0x322659, lightColor: 0xb794f4, bubbleColor: 0x9f7aea },
+            { name: 'Warm Sunset', color: 0x4a2810, lightColor: 0xf6ad55, bubbleColor: 0xed8936 }
+          ];
+
+          this.playlists = [
+            { source: 'Spotify', title: 'Spotify: Ambient Sleep', url: 'https://cdn.jsdelivr.net/gh/xrblocks/assets@main/demos/rain/rain.opus' },
+            { source: 'Spotify', title: 'Spotify: Lofi Beats', url: 'https://actions.google.com/sounds/v1/ambiences/rain_heavy.ogg' },
+            { source: 'YouTube Music', title: 'YT Music: Calm Piano', url: 'https://actions.google.com/sounds/v1/ambiences/outdoor_rain.ogg' },
+            { source: 'YouTube Music', title: 'YT Music: White Noise Waves', url: 'https://cdn.jsdelivr.net/gh/xrblocks/assets@main/demos/rain/rain.opus' }
+          ];
+          this.currentPlaylistIndex = 0;
+        }
+
+        async init() {
+          if (xb.core.input.raycaster) {
+            xb.core.input.raycaster.sortFunction = raycastSortFunction;
+          }
+
+          this.ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+          this.add(this.ambientLight);
+
+          this.directionalLight = new THREE.DirectionalLight(0x63b3ed, this.lightIntensity);
+          this.directionalLight.position.set(0, 5, 2);
+          this.add(this.directionalLight);
+
+          const roomGeometry = new THREE.SphereGeometry(8, 32, 32);
+          const roomMaterial = new THREE.MeshBasicMaterial({
+            color: 0x1a365d,
+            side: THREE.BackSide
+          });
+          this.roomMesh = new THREE.Mesh(roomGeometry, roomMaterial);
+          this.add(this.roomMesh);
+
+          this.createSensoryBubbles();
+          this.createControlPanel();
+          this.setupAudio();
+        }
+
+        setupAudio() {
+          this.audioListener = new THREE.AudioListener();
+          xb.core.camera.add(this.audioListener);
+
+          this.sound = new THREE.Audio(this.audioListener);
+          const audioLoader = new THREE.AudioLoader();
+          
+          audioLoader.load(this.playlists[0].url, (buffer) => {
+            this.sound.setBuffer(buffer);
+            this.sound.setLoop(true);
+            this.sound.setVolume(0.5);
+          }, undefined, (err) => {
+            console.warn('Audio stream fallback loader encountered an issue:', err);
+          });
+        }
+
+        createSensoryBubbles() {
+          const particleCount = 180;
+          const geometry = new THREE.SphereGeometry(0.06, 16, 16);
+          const material = new THREE.MeshStandardMaterial({
+            color: 0x4299e1,
+            transparent: true,
+            opacity: 0.65,
+            roughness: 0.1,
+            metalness: 0.2
+          });
+
+          this.bubbleParticles = new THREE.InstancedMesh(geometry, material, particleCount);
+          const dummy = new THREE.Object3D();
+          this.bubbleData = [];
+
+          for (let i = 0; i < particleCount; i++) {
+            const x = (Math.random() - 0.5) * 6;
+            const y = Math.random() * 4;
+            const z = (Math.random() - 0.5) * 6 - 1.5;
+            dummy.position.set(x, y, z);
+            dummy.updateMatrix();
+            this.bubbleParticles.setMatrixAt(i, dummy.matrix);
+
+            this.bubbleData.push({
+              x: x,
+              y: y,
+              z: z,
+              baseSpeed: 0.002 + Math.random() * 0.003,
+              wobbleSpeed: 1 + Math.random() * 3,
+              wobbleAmount: 0.02 + Math.random() * 0.03
+            });
+          }
+
+          this.bubbleParticles.instanceMatrix.needsUpdate = true;
+          this.add(this.bubbleParticles);
+        }
+
+        createControlPanel() {
+          const card = this.uiCore.createCard({
+            name: 'SensoryControlCard',
+            sizeX: 1.4,
+            sizeY: 1.35,
+            position: new THREE.Vector3(0, 1.4, -1.6),
+            behaviors: [
+              new ManipulationBehavior({
+                draggable: true,
+                manipulationMargin: 100,
+                manipulationCornerRadius: 60,
+              }),
+            ],
+          });
+
+          const panel = new UIPanel({
+            width: '100%',
+            height: '100%',
+            fillColor: 'rgba(15, 23, 42, 0.94)',
+            cornerRadius: 40,
+            padding: 25,
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          });
+          card.add(panel);
+
+          const title = new UIText('Sensory Sanctuary & Music', {
+            fontSize: 38,
+            fontWeight: 'bold',
+            color: '#e2e8f0',
+            textAlign: 'center'
+          });
+          panel.add(title);
+
+          const subtitle = new UIText('Themes, Custom Speed, Spotify & YouTube Music', {
+            fontSize: 20,
+            color: '#94a3b8',
+            textAlign: 'center'
+          });
+          panel.add(subtitle);
+
+          const themeRow = new UIPanel({
+            flexDirection: 'row',
+            gap: 12,
+            width: '100%',
+            justifyContent: 'center',
+            alignItems: 'center',
+          });
+
+          const createButton = (label, onClickCb, bg = '#334155') => {
+            const button = new UIPanel({
+              width: 195,
+              height: 60,
+              cornerRadius: 20,
+              fillColor: bg,
+              justifyContent: 'center',
+              alignItems: 'center',
+              onHoverEnter: () => { button.setFillColor('#475569'); },
+              onHoverExit: () => { button.setFillColor(bg); },
+              onClick: onClickCb,
+            });
+
+            const btnText = new UIText(label, {
+              fontSize: 24,
+              color: '#ffffff',
+              textAlign: 'center'
+            });
+            button.add(btnText);
+            return button;
+          };
+
+          themeRow.add(createButton('🌊 Ocean', () => this.setTheme(0)));
+          themeRow.add(createButton('🌲 Forest', () => this.setTheme(1)));
+          panel.add(themeRow);
+
+          const themeRow2 = new UIPanel({
+            flexDirection: 'row',
+            gap: 12,
+            width: '100%',
+            justifyContent: 'center',
+            alignItems: 'center',
+          });
+          themeRow2.add(createButton('💜 Lavender', () => this.setTheme(2)));
+          themeRow2.add(createButton('🌅 Sunset', () => this.setTheme(3)));
+          panel.add(themeRow2);
+
+          const customRow = new UIPanel({
+            flexDirection: 'row',
+            gap: 12,
+            width: '100%',
+            justifyContent: 'center',
+            alignItems: 'center',
+          });
+
+          customRow.add(createButton('🫧 Speed', () => this.cycleBubbleSpeed(), '#1e293b'));
+          customRow.add(createButton('💡 Light', () => this.cycleLightIntensity(), '#1e293b'));
+          customRow.add(createButton('🧘 Breathe', () => this.toggleBreathingGuide(), '#047857'));
+          panel.add(customRow);
+
+          const musicRow = new UIPanel({
+            flexDirection: 'row',
+            gap: 12,
+            width: '100%',
+            justifyContent: 'center',
+            alignItems: 'center',
+          });
+
+          musicRow.add(createButton('🎵 Play/Pause', () => this.toggleMusic(), '#1db954'));
+          musicRow.add(createButton('▶ YT / Spot Next', () => this.nextMusicTrack(), '#ff0000'));
+          panel.add(musicRow);
+        }
+
+        setTheme(index) {
+          this.currentThemeIndex = index;
+          const theme = this.themes[index];
+          this.roomMesh.material.color.setHex(theme.color);
+          this.directionalLight.color.setHex(theme.lightColor);
+          if (this.bubbleParticles) {
+            this.bubbleParticles.material.color.setHex(theme.bubbleColor);
+          }
+        }
+
+        cycleBubbleSpeed() {
+          if (this.bubbleSpeedMultiplier === 1.0) {
+            this.bubbleSpeedMultiplier = 0.5;
+          } else if (this.bubbleSpeedMultiplier === 0.5) {
+            this.bubbleSpeedMultiplier = 2.0;
+          } else {
+            this.bubbleSpeedMultiplier = 1.0;
+          }
+        }
+
+        cycleLightIntensity() {
+          if (this.lightIntensity === 2.0) {
+            this.lightIntensity = 1.0;
+          } else if (this.lightIntensity === 1.0) {
+            this.lightIntensity = 3.0;
+          } else {
+            this.lightIntensity = 2.0;
+          }
+          this.directionalLight.intensity = this.lightIntensity;
+        }
+
+        toggleBreathingGuide() {
+          this.isBreathingActive = !this.isBreathingActive;
+          if (!this.isBreathingActive) {
+            this.roomMesh.scale.set(1, 1, 1);
+          }
+        }
+
+        toggleMusic() {
+          if (this.audioListener.context.state === 'suspended') {
+            this.audioListener.context.resume();
+          }
+
+          if (this.isMusicPlaying) {
+            if (this.sound.isPlaying) this.sound.pause();
+            this.isMusicPlaying = false;
+          } else {
+            if (!this.sound.isPlaying && this.sound.buffer) {
+              this.sound.play();
+            }
+            this.isMusicPlaying = true;
+          }
+        }
+
+        nextMusicTrack() {
+          this.currentPlaylistIndex = (this.currentPlaylistIndex + 1) % this.playlists.length;
+          const playlist = this.playlists[this.currentPlaylistIndex];
+          console.log(`Switching to: ${playlist.title}`);
+          
+          if (this.sound.isPlaying) {
+            this.sound.stop();
+          }
+
+          const audioLoader = new THREE.AudioLoader();
+          audioLoader.load(playlist.url, (buffer) => {
+            this.sound.setBuffer(buffer);
+            this.sound.setLoop(true);
+            if (this.isMusicPlaying) {
+              this.sound.play();
+            }
+          });
+        }
+
+        update() {
+          if (this.isBreathingActive) {
+            this.breathingPhase += 0.015;
+            const pulse = 1.0 + Math.sin(this.breathingPhase) * 0.04;
+            this.roomMesh.scale.setScalar(pulse);
+          }
+
+          if (this.bubbleParticles && this.bubbleData) {
+            const time = performance.now() * 0.001;
+            const dummy = new THREE.Object3D();
+
+            for (let i = 0; i < this.bubbleData.length; i++) {
+              const data = this.bubbleData[i];
+              data.y += data.baseSpeed * this.bubbleSpeedMultiplier;
+              if (data.y > 4.5) data.y = -0.5;
+
+              const wobbleX = data.x + Math.sin(time * data.wobbleSpeed + i) * data.wobbleAmount;
+              const wobbleZ = data.z + Math.cos(time * data.wobbleSpeed + i) * data.wobbleAmount;
+
+              dummy.position.set(wobbleX, data.y, wobbleZ);
+              dummy.updateMatrix();
+              this.bubbleParticles.setMatrixAt(i, dummy.matrix);
+            }
+            this.bubbleParticles.instanceMatrix.needsUpdate = true;
+          }
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        const options = new xb.Options();
+        options.enableUI();
+        options.uikit.enable(uikit);
+        options.setAppTitle('Customizable VR Sensory Room with Spotify & YouTube Music');
+        xb.add(new MultiPlatformSensoryRoomScript());
+        xb.init(options);
+      });
+    </script>
+  </body>
+</html>
