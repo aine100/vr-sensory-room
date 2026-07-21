@@ -49,6 +49,8 @@
           this.ambientLight = null;
           this.directionalLight = null;
           this.bubbleParticles = null;
+          this.lamps = [];
+          this.lavaLamp = null;
           
           this.currentThemeIndex = 0;
           this.bubbleSpeedMultiplier = 1.0;
@@ -81,16 +83,51 @@
           this.add(this.directionalLight);
 
           this.createRoomEnvironment();
+          this.createTableAndLavaLamp();
           this.createSensoryBubbles();
           this.createWallSpotifyPlayer();
           this.createWallControlAndSwitches();
-          this.createSketchfabSofa();
+          this.createSketchfabCouch();
+          
+          // Set initial theme
+          this.setTheme(0);
         }
 
-        async createSketchfabSofa() {
-          const sofa = new xb.ModelViewer({});
-          this.add(sofa);
+        async createSketchfabCouch() {
+          // Render immediate robust 3D couch fallback so it appears instantly
+          const couchGroup = new THREE.Group();
+          const fabricMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.7 });
+          
+          const seatGeo = new THREE.BoxGeometry(1.6, 0.35, 0.8);
+          const seat = new THREE.Mesh(seatGeo, fabricMat);
+          seat.position.y = 0.35;
+          seat.castShadow = true;
+          seat.receiveShadow = true;
+          couchGroup.add(seat);
+
+          const backGeo = new THREE.BoxGeometry(1.6, 0.8, 0.25);
+          const back = new THREE.Mesh(backGeo, fabricMat);
+          back.position.set(0, 0.75, -0.3);
+          back.castShadow = true;
+          couchGroup.add(back);
+
+          const armGeo = new THREE.BoxGeometry(0.25, 0.6, 0.85);
+          const leftArm = new THREE.Mesh(armGeo, fabricMat);
+          leftArm.position.set(-0.9, 0.5, 0);
+          leftArm.castShadow = true;
+          couchGroup.add(leftArm);
+
+          const rightArm = new THREE.Mesh(armGeo, fabricMat);
+          rightArm.position.set(0.9, 0.5, 0);
+          rightArm.castShadow = true;
+          couchGroup.add(rightArm);
+
+          couchGroup.position.set(0, 0, -1.8);
+          this.add(couchGroup);
+
+          // Try loading user's custom GLB from GitHub in background
           try {
+            const sofa = new xb.ModelViewer({});
             await sofa.loadGLTFModel({
               data: {
                 path: 'https://cdn.jsdelivr.net/gh/aine100/vr-sensory-room@main/',
@@ -100,12 +137,30 @@
               },
               renderer: xb.core.renderer,
             });
-            sofa.position.set(0, 0, -1.8);
+            
+            // Calculate actual size of the loaded model
+            const box = new THREE.Box3().setFromObject(sofa);
+            const size = new THREE.Vector3();
+            box.getSize(size);
+            
+            // Scale it so it is exactly 2 meters wide
+            const scaleFactor = 2.0 / size.x;
+            sofa.scale.set(scaleFactor, scaleFactor, scaleFactor);
+            
+            // Re-calculate box after scaling to find exact floor offset
+            const scaledBox = new THREE.Box3().setFromObject(sofa);
+            const lowestPoint = scaledBox.min.y;
+
+            // Position it to rest exactly on the floor (y=0)
+            sofa.position.set(0, -lowestPoint + 0.01, -1.8);
             sofa.castShadow = true;
             sofa.receiveShadow = true;
-            console.log('Custom Sketchfab sofa loaded successfully!');
+            
+            this.remove(couchGroup);
+            this.add(sofa);
+            console.log('Custom Sketchfab sofa loaded and scaled successfully!');
           } catch (e) {
-            console.warn('Failed to load custom sofa model:', e);
+            console.warn('Using built-in cozy sofa model.');
           }
         }
 
@@ -114,132 +169,116 @@
           const roomHeight = 4;
           const roomDepth = 10;
 
-          const wallCanvas = document.createElement('canvas');
-          wallCanvas.width = 512;
-          wallCanvas.height = 512;
-          const wCtx = wallCanvas.getContext('2d');
-          wCtx.fillStyle = '#1e293b';
-          wCtx.fillRect(0, 0, 512, 512);
-          for(let i=0; i<4000; i++) {
-            wCtx.fillStyle = Math.random() > 0.5 ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.05)';
-            wCtx.fillRect(Math.random()*512, Math.random()*512, 2, 2);
-          }
-          const wallTexture = new THREE.CanvasTexture(wallCanvas);
-          wallTexture.wrapS = THREE.RepeatWrapping;
-          wallTexture.wrapT = THREE.RepeatWrapping;
-          wallTexture.repeat.set(4, 2);
-
-          const wallMaterial = new THREE.MeshStandardMaterial({
-            map: wallTexture,
+          // White Walls
+          const wallMat = new THREE.MeshStandardMaterial({
+            color: 0xf8fafc, // Clean bright white
             roughness: 0.9,
             metalness: 0.05,
             side: THREE.BackSide
           });
 
           const roomGeo = new THREE.BoxGeometry(roomWidth, roomHeight, roomDepth);
-          const roomMesh = new THREE.Mesh(roomGeo, wallMaterial);
+          const roomMesh = new THREE.Mesh(roomGeo, wallMat);
           roomMesh.position.y = roomHeight / 2;
           this.roomMesh = roomMesh;
           this.add(roomMesh);
 
+          // Plain Dark Floor
           const floorGeometry = new THREE.PlaneGeometry(roomWidth, roomDepth);
           const floorMaterial = new THREE.MeshStandardMaterial({
-            color: 0x0f172a, // Clean, plain dark base
-            roughness: 0.8,
-            metalness: 0.05
+            color: 0x0f172a, // Plain dark slate
+            roughness: 0.7,
+            metalness: 0.1
           });
           const floor = new THREE.Mesh(floorGeometry, floorMaterial);
           floor.rotation.x = -Math.PI / 2;
-          floor.position.y = 0;
+          // Raise slightly to prevent z-fighting with WebXR depth meshes
+          floor.position.y = 0.01; 
           floor.receiveShadow = true;
           this.add(floor);
 
-          // Realistic 3D Standing Floor Lamps
+          // Realistic 3D Standing Floor Lamps (Modern Cylindrical)
           const lampPoleGeo = new THREE.CylinderGeometry(0.03, 0.03, 3.2, 16);
           const lampMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.2 });
-          
-          // Modern cylindrical lamp shades
-          const shadeGeo = new THREE.CylinderGeometry(0.3, 0.35, 0.6, 32, 1, true);
-          const shadeMat = new THREE.MeshStandardMaterial({ 
-            color: 0xfef08a, 
-            emissive: 0xfef08a, 
-            emissiveIntensity: 0.6, 
-            roughness: 0.1,
-            side: THREE.DoubleSide
-          });
+          const shadeGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.8, 32, 1, true); // Open cylindrical shade
+          const shadeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.8, roughness: 0.1, side: THREE.DoubleSide });
 
-          const lampGroup1 = new THREE.Group();
-          const pole1 = new THREE.Mesh(lampPoleGeo, lampMat);
-          pole1.position.y = 1.6;
-          lampGroup1.add(pole1);
-          const shade1 = new THREE.Mesh(shadeGeo, shadeMat);
-          shade1.position.y = 3.0;
-          lampGroup1.add(shade1);
-          lampGroup1.position.set(-4.2, 0, -4.2);
-          this.add(lampGroup1);
+          const createLamp = (x, z) => {
+            const lampGroup = new THREE.Group();
+            const pole = new THREE.Mesh(lampPoleGeo, lampMat);
+            pole.position.y = 1.6;
+            lampGroup.add(pole);
+            const shade = new THREE.Mesh(shadeGeo, shadeMat);
+            shade.position.y = 3.0;
+            lampGroup.add(shade);
+            lampGroup.position.set(x, 0, z);
+            this.add(lampGroup);
+            this.lamps.push(shade); // Store for theme coloring
 
-          const lampGroup2 = new THREE.Group();
-          const pole2 = new THREE.Mesh(lampPoleGeo, lampMat);
-          pole2.position.y = 1.6;
-          lampGroup2.add(pole2);
-          const shade2 = new THREE.Mesh(shadeGeo, shadeMat);
-          shade2.position.y = 3.0;
-          lampGroup2.add(shade2);
-          lampGroup2.position.set(4.2, 0, -4.2);
-          this.add(lampGroup2);
+            const light = new THREE.PointLight(0xffffff, 1.5, 6);
+            light.position.set(x, 3.0, z);
+            this.add(light);
+            this.lamps.push(light); // Store for theme coloring
+          };
 
-          const warmLight1 = new THREE.PointLight(0xfef08a, 1.5, 6);
-          warmLight1.position.set(-4.2, 3.0, -4.2);
-          this.add(warmLight1);
-
-          const warmLight2 = new THREE.PointLight(0xfef08a, 1.5, 6);
-          warmLight2.position.set(4.2, 3.0, -4.2);
-          this.add(warmLight2);
+          createLamp(-4.2, -4.2);
+          createLamp(4.2, -4.2);
 
           // Scenic Relaxing Window
-          const windowGeo = new THREE.PlaneGeometry(2.2, 2.6);
+          const windowGeo = new THREE.PlaneGeometry(2.5, 2.8);
           const wCanvas = document.createElement('canvas');
           wCanvas.width = 1024;
           wCanvas.height = 1024;
           const viewCtx = wCanvas.getContext('2d');
           
           const grad = viewCtx.createLinearGradient(0, 0, 0, 1024);
-          grad.addColorStop(0, '#3b82f6');
-          grad.addColorStop(0.5, '#f43f5e');
-          grad.addColorStop(1, '#f59e0b');
+          grad.addColorStop(0, '#60a5fa');
+          grad.addColorStop(0.4, '#f43f5e');
+          grad.addColorStop(1, '#fbbf24');
           viewCtx.fillStyle = grad;
           viewCtx.fillRect(0, 0, 1024, 1024);
 
           viewCtx.fillStyle = '#fef08a';
           viewCtx.beginPath();
-          viewCtx.arc(512, 512, 120, 0, Math.PI * 2);
+          viewCtx.arc(512, 450, 100, 0, Math.PI * 2);
+          viewCtx.fill();
+
+          viewCtx.fillStyle = '#1e293b';
+          viewCtx.beginPath();
+          viewCtx.moveTo(0, 1024);
+          viewCtx.lineTo(0, 700);
+          viewCtx.lineTo(250, 480);
+          viewCtx.lineTo(500, 650);
+          viewCtx.lineTo(750, 420);
+          viewCtx.lineTo(1024, 550);
+          viewCtx.lineTo(1024, 1024);
           viewCtx.fill();
 
           viewCtx.fillStyle = '#0f172a';
           viewCtx.beginPath();
           viewCtx.moveTo(0, 1024);
-          viewCtx.lineTo(0, 700);
-          viewCtx.lineTo(300, 500);
-          viewCtx.lineTo(600, 650);
-          viewCtx.lineTo(1024, 450);
+          viewCtx.lineTo(0, 780);
+          viewCtx.lineTo(350, 620);
+          viewCtx.lineTo(700, 750);
+          viewCtx.lineTo(1024, 680);
           viewCtx.lineTo(1024, 1024);
           viewCtx.fill();
 
           const windowTexture = new THREE.CanvasTexture(wCanvas);
           const windowMat = new THREE.MeshBasicMaterial({ map: windowTexture });
           const windowMesh = new THREE.Mesh(windowGeo, windowMat);
-          windowMesh.position.set(roomWidth / 2 - 0.02, 2.2, -1.0);
+          windowMesh.position.set(roomWidth / 2 - 0.02, 2.2, 0);
           windowMesh.rotation.y = -Math.PI / 2;
           this.add(windowMesh);
 
-          const frameGeo = new THREE.BoxGeometry(2.4, 2.8, 0.1);
+          const frameGeo = new THREE.BoxGeometry(2.7, 3.0, 0.12);
           const frameMat = new THREE.MeshStandardMaterial({ color: '#1e293b', roughness: 0.4 });
           const frameMesh = new THREE.Mesh(frameGeo, frameMat);
-          frameMesh.position.set(roomWidth / 2 - 0.05, 2.2, -1.0);
+          frameMesh.position.set(roomWidth / 2 - 0.05, 2.2, 0);
           frameMesh.rotation.y = -Math.PI / 2;
           this.add(frameMesh);
 
-          // Taylor Swift Poster using uploaded GitHub asset (taylor_poster.png)
+          // Taylor Swift Poster
           const posterGeo = new THREE.PlaneGeometry(1.5, 2.1);
           const posterMat = new THREE.MeshStandardMaterial({ roughness: 0.2 });
           const posterMesh = new THREE.Mesh(posterGeo, posterMat);
@@ -279,6 +318,68 @@
           );
         }
 
+        createTableAndLavaLamp() {
+          const tableGroup = new THREE.Group();
+          
+          // Simple Table
+          const legGeo = new THREE.CylinderGeometry(0.04, 0.02, 0.8, 16);
+          const woodMat = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.7 });
+          
+          const l1 = new THREE.Mesh(legGeo, woodMat); l1.position.set(-0.3, 0.4, -0.3); tableGroup.add(l1);
+          const l2 = new THREE.Mesh(legGeo, woodMat); l2.position.set(0.3, 0.4, -0.3); tableGroup.add(l2);
+          const l3 = new THREE.Mesh(legGeo, woodMat); l3.position.set(-0.3, 0.4, 0.3); tableGroup.add(l3);
+          const l4 = new THREE.Mesh(legGeo, woodMat); l4.position.set(0.3, 0.4, 0.3); tableGroup.add(l4);
+          
+          const topGeo = new THREE.BoxGeometry(0.8, 0.05, 0.8);
+          const top = new THREE.Mesh(topGeo, woodMat);
+          top.position.y = 0.825;
+          tableGroup.add(top);
+
+          // Lava Lamp Base
+          const lavaGroup = new THREE.Group();
+          const baseGeo = new THREE.ConeGeometry(0.12, 0.2, 32);
+          const metalMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9, roughness: 0.2 });
+          const base = new THREE.Mesh(baseGeo, metalMat);
+          base.position.y = 0.1;
+          lavaGroup.add(base);
+
+          const capGeo = new THREE.ConeGeometry(0.08, 0.1, 32);
+          const cap = new THREE.Mesh(capGeo, metalMat);
+          cap.position.y = 0.65;
+          lavaGroup.add(cap);
+
+          // Lava Lamp Glass
+          const glassGeo = new THREE.CylinderGeometry(0.08, 0.12, 0.4, 32);
+          const glassMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, transmission: 0.8, opacity: 1, transparent: true, roughness: 0.1, ior: 1.5 });
+          const glass = new THREE.Mesh(glassGeo, glassMat);
+          glass.position.y = 0.4;
+          lavaGroup.add(glass);
+
+          // Lava Blobs
+          const blobGeo = new THREE.SphereGeometry(0.05, 32, 32);
+          this.lavaBlobMat = new THREE.MeshStandardMaterial({ color: 0x4299e1, emissive: 0x4299e1, emissiveIntensity: 0.8 });
+          
+          this.lavaBlobs = [];
+          for(let i=0; i<4; i++) {
+            const blob = new THREE.Mesh(blobGeo, this.lavaBlobMat);
+            blob.position.y = 0.25 + Math.random() * 0.3;
+            blob.userData = { offset: Math.random() * Math.PI * 2, speed: 0.5 + Math.random() * 0.5 };
+            lavaGroup.add(blob);
+            this.lavaBlobs.push(blob);
+          }
+
+          // Lava Lamp Light
+          this.lavaLight = new THREE.PointLight(0x4299e1, 1.0, 3);
+          this.lavaLight.position.y = 0.4;
+          lavaGroup.add(this.lavaLight);
+
+          lavaGroup.position.set(0, 0.85, 0);
+          tableGroup.add(lavaGroup);
+
+          tableGroup.position.set(3.5, 0.01, -3.5);
+          this.add(tableGroup);
+        }
+
         createWallSpotifyPlayer() {
           const tvGroup = new THREE.Group();
 
@@ -305,7 +406,6 @@
           screenMesh.position.z = 0.042;
           tvGroup.add(screenMesh);
 
-          // Moved to the left side of the back wall to avoid overlapping controls
           tvGroup.position.set(-3.0, 2.2, -4.95);
           tvGroup.rotation.y = 0;
           this.add(tvGroup);
@@ -358,126 +458,66 @@
         createWallControlAndSwitches() {
           const switchGeo = new THREE.PlaneGeometry(0.55, 0.7);
           
-          // Bubbles Toggle Switch (On/Off)
-          const canvasToggle = document.createElement('canvas');
-          canvasToggle.width = 256;
-          canvasToggle.height = 256;
-          const ctxToggle = canvasToggle.getContext('2d');
-          ctxToggle.fillStyle = '#1e293b';
-          ctxToggle.fillRect(0, 0, 256, 256);
-          ctxToggle.fillStyle = '#10b981';
-          ctxToggle.beginPath();
-          ctxToggle.arc(128, 110, 50, 0, Math.PI * 2);
-          ctxToggle.fill();
-          ctxToggle.fillStyle = '#ffffff';
-          ctxToggle.font = 'bold 20px Inter, sans-serif';
-          ctxToggle.textAlign = 'center';
-          ctxToggle.fillText('🫧 ON/OFF', 128, 205);
+          const createSwitch = (icon, label, color, xPos, action) => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(0, 0, 512, 512);
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(256, 220, 100, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 40px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(icon + ' ' + label, 256, 410);
 
-          const textureToggle = new THREE.CanvasTexture(canvasToggle);
-          const matToggle = new THREE.MeshStandardMaterial({ map: textureToggle, roughness: 0.2 });
-          const meshToggle = new THREE.Mesh(switchGeo, matToggle);
-          meshToggle.position.set(-0.9, 2.2, -4.95);
-          meshToggle.userData = { action: 'toggle_bubbles' };
-          this.add(meshToggle);
+            const texture = new THREE.CanvasTexture(canvas);
+            const mat = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.2 });
+            const mesh = new THREE.Mesh(switchGeo, mat);
+            mesh.position.set(xPos, 2.2, -4.95);
+            mesh.userData = { action: action };
+            this.add(mesh);
+          };
 
-          // Bubble Speed Switch
-          const canvasBubble = document.createElement('canvas');
-          canvasBubble.width = 256;
-          canvasBubble.height = 256;
-          const ctxBubble = canvasBubble.getContext('2d');
-          ctxBubble.fillStyle = '#1e293b';
-          ctxBubble.fillRect(0, 0, 256, 256);
-          ctxBubble.fillStyle = '#38bdf8';
-          ctxBubble.beginPath();
-          ctxBubble.arc(128, 110, 50, 0, Math.PI * 2);
-          ctxBubble.fill();
-          ctxBubble.fillStyle = '#ffffff';
-          ctxBubble.font = 'bold 20px Inter, sans-serif';
-          ctxBubble.textAlign = 'center';
-          ctxBubble.fillText('🫧 SPEED', 128, 205);
+          createSwitch('🫧', 'ON/OFF', '#10b981', -0.9, 'toggle_bubbles');
+          createSwitch('🫧', 'SPEED', '#38bdf8', -0.3, 'speed');
+          createSwitch('💡', 'LIGHT', '#fbbf24', 0.3, 'light');
+          createSwitch('🎨', 'THEME', '#a855f7', 0.9, 'theme');
 
-          const textureBubble = new THREE.CanvasTexture(canvasBubble);
-          const matBubble = new THREE.MeshStandardMaterial({ map: textureBubble, roughness: 0.2 });
-          const meshBubble = new THREE.Mesh(switchGeo, matBubble);
-          meshBubble.position.set(-0.3, 2.2, -4.95);
-          meshBubble.userData = { action: 'speed' };
-          this.add(meshBubble);
-
-          // Light Intensity Switch
-          const canvasLight = document.createElement('canvas');
-          canvasLight.width = 256;
-          canvasLight.height = 256;
-          const ctxLight = canvasLight.getContext('2d');
-          ctxLight.fillStyle = '#1e293b';
-          ctxLight.fillRect(0, 0, 256, 256);
-          ctxLight.fillStyle = '#fbbf24';
-          ctxLight.beginPath();
-          ctxLight.arc(128, 110, 50, 0, Math.PI * 2);
-          ctxLight.fill();
-          ctxLight.fillStyle = '#ffffff';
-          ctxLight.font = 'bold 20px Inter, sans-serif';
-          ctxLight.textAlign = 'center';
-          ctxLight.fillText('💡 LIGHT', 128, 205);
-
-          const textureLight = new THREE.CanvasTexture(canvasLight);
-          const matLight = new THREE.MeshStandardMaterial({ map: textureLight, roughness: 0.2 });
-          const meshLight = new THREE.Mesh(switchGeo, matLight);
-          meshLight.position.set(0.3, 2.2, -4.95);
-          meshLight.userData = { action: 'light' };
-          this.add(meshLight);
-
-          // Theme Cycle Switch
-          const canvasTheme = document.createElement('canvas');
-          canvasTheme.width = 256;
-          canvasTheme.height = 256;
-          const ctxTheme = canvasTheme.getContext('2d');
-          ctxTheme.fillStyle = '#1e293b';
-          ctxTheme.fillRect(0, 0, 256, 256);
-          ctxTheme.fillStyle = '#a855f7';
-          ctxTheme.beginPath();
-          ctxTheme.arc(128, 110, 50, 0, Math.PI * 2);
-          ctxTheme.fill();
-          ctxTheme.fillStyle = '#ffffff';
-          ctxTheme.font = 'bold 20px Inter, sans-serif';
-          ctxTheme.textAlign = 'center';
-          ctxTheme.fillText('🎨 THEME', 128, 205);
-
-          const textureTheme = new THREE.CanvasTexture(canvasTheme);
-          const matTheme = new THREE.MeshStandardMaterial({ map: textureTheme, roughness: 0.2 });
-          const meshTheme = new THREE.Mesh(switchGeo, matTheme);
-          meshTheme.position.set(0.9, 2.2, -4.95);
-          meshTheme.userData = { action: 'theme' };
-          this.add(meshTheme);
-
-          // Cute Individual Theme Buttons Panel
+          // Transparent Theme Buttons Panel
           const themePanelGeo = new THREE.PlaneGeometry(2.4, 0.6);
           const tCanvas = document.createElement('canvas');
-          tCanvas.width = 768;
-          tCanvas.height = 192;
+          tCanvas.width = 1536;
+          tCanvas.height = 384;
           const tCtx = tCanvas.getContext('2d');
           
-          tCtx.fillStyle = '#0f172a';
-          tCtx.fillRect(0, 0, 768, 192);
+          tCtx.clearRect(0, 0, 1536, 384);
 
           const themeNames = ['Ocean', 'Forest', 'Lavender', 'Sunset', 'Aurora', 'Neon'];
           const colors = ['#63b3ed', '#68d391', '#b794f4', '#f6ad55', '#34d399', '#f43f5e'];
           
           for(let i=0; i<6; i++) {
-            const x = 12 + i * 124;
+            const x = 24 + i * 248;
             tCtx.fillStyle = colors[i];
             tCtx.beginPath();
-            tCtx.roundRect(x, 24, 112, 144, 24);
+            tCtx.roundRect(x, 48, 224, 288, 48);
             tCtx.fill();
 
             tCtx.fillStyle = '#ffffff';
-            tCtx.font = 'bold 22px Inter, sans-serif';
+            tCtx.font = 'bold 44px Inter, sans-serif';
             tCtx.textAlign = 'center';
-            tCtx.fillText(themeNames[i], x + 56, 110);
+            tCtx.fillText(themeNames[i], x + 112, 220);
           }
 
           const tTexture = new THREE.CanvasTexture(tCanvas);
-          const tMat = new THREE.MeshStandardMaterial({ map: tTexture, roughness: 0.3 });
+          const tMat = new THREE.MeshStandardMaterial({ 
+            map: tTexture, 
+            transparent: true,
+            roughness: 0.3 
+          });
           const tMesh = new THREE.Mesh(themePanelGeo, tMat);
           tMesh.position.set(0.0, 1.35, -4.95);
           tMesh.userData = { action: 'theme_panel' };
@@ -494,11 +534,52 @@
         setTheme(index) {
           this.currentThemeIndex = index;
           const theme = this.themes[index];
-          this.roomMesh.material.color.setHex(theme.color);
+          
+          // Optional: slight tint to the room mesh for extreme moods
+          // this.roomMesh.material.color.setHex(theme.color);
+          
           this.directionalLight.color.setHex(theme.lightColor);
-          if (this.bubbleParticles) {
-            this.bubbleParticles.material.color.setHex(theme.bubbleColor);
+          
+          // Update standing lamps
+          this.lamps.forEach(lamp => {
+            if(lamp.isPointLight) {
+              lamp.color.setHex(theme.lightColor);
+            } else if (lamp.material) {
+              lamp.material.color.setHex(theme.lightColor);
+              lamp.material.emissive.setHex(theme.lightColor);
+            }
+          });
+
+          // Update Lava Lamp
+          if (this.lavaBlobMat && this.lavaLight) {
+            this.lavaBlobMat.color.setHex(theme.bubbleColor);
+            this.lavaBlobMat.emissive.setHex(theme.bubbleColor);
+            this.lavaLight.color.setHex(theme.bubbleColor);
           }
+
+          // Update bubbles with HSL hue variation
+          if (this.bubbleParticles) {
+            this.applyThemeColorsToBubbles(theme.bubbleColor);
+          }
+        }
+
+        applyThemeColorsToBubbles(hexColor) {
+          if (!this.bubbleParticles) return;
+          const baseColor = new THREE.Color(hexColor);
+          const hsl = {};
+          baseColor.getHSL(hsl);
+          const tempColor = new THREE.Color();
+          
+          for (let i = 0; i < this.bubbleParticles.count; i++) {
+            // Vary hue by +/- 15%, saturation by +/- 20%, lightness by +/- 30%
+            const h = (hsl.h + (Math.random() - 0.5) * 0.15 + 1.0) % 1.0;
+            const s = Math.min(Math.max(hsl.s + (Math.random() - 0.5) * 0.2, 0), 1);
+            const l = Math.min(Math.max(hsl.l + (Math.random() - 0.5) * 0.3, 0.2), 0.8);
+            tempColor.setHSL(h, s, l);
+            this.bubbleParticles.setColorAt(i, tempColor);
+          }
+          this.bubbleParticles.instanceColor.needsUpdate = true;
+          this.bubbleParticles.material.color.setHex(0xffffff); // Use white base material so instance color multiplies
         }
 
         cycleTheme() {
@@ -549,10 +630,10 @@
         }
 
         createSensoryBubbles() {
-          const particleCount = 200;
+          const particleCount = 60; // Reduced count for calmer environment
           const geometry = new THREE.SphereGeometry(0.06, 16, 16);
           const material = new THREE.MeshStandardMaterial({
-            color: 0x4299e1,
+            color: 0xffffff,
             transparent: true,
             opacity: 0.7,
             roughness: 0.1,
@@ -567,7 +648,10 @@
             const x = (Math.random() - 0.5) * 7;
             const y = Math.random() * 3.5;
             const z = (Math.random() - 0.5) * 7;
+            const scale = 0.5 + Math.random() * 1.5; // Variety of sizes
+            
             dummy.position.set(x, y, z);
+            dummy.scale.setScalar(scale);
             dummy.updateMatrix();
             this.bubbleParticles.setMatrixAt(i, dummy.matrix);
 
@@ -575,6 +659,7 @@
               x: x,
               y: y,
               z: z,
+              scale: scale,
               baseSpeed: 0.002 + Math.random() * 0.003,
               wobbleSpeed: 1 + Math.random() * 3,
               wobbleAmount: 0.02 + Math.random() * 0.03,
@@ -588,31 +673,87 @@
           this.add(this.bubbleParticles);
         }
 
+        handleLocomotion() {
+          if (!xb.core.input || !xb.core.input.controllers) return;
+          
+          const xrCamera = xb.core.renderer.xr.getCamera();
+          const speed = 0.04;
+
+          for (const controller of xb.core.input.controllers) {
+            const gamepad = controller.gamepad;
+            if (gamepad && gamepad.axes.length >= 4) {
+              const xAxis = gamepad.axes[2]; // usually thumbstick X
+              const yAxis = gamepad.axes[3]; // usually thumbstick Y
+
+              if (Math.abs(xAxis) > 0.1 || Math.abs(yAxis) > 0.1) {
+                // Calculate movement relative to camera orientation
+                const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(xrCamera.quaternion);
+                forward.y = 0; 
+                forward.normalize();
+                
+                const right = new THREE.Vector3(1, 0, 0).applyQuaternion(xrCamera.quaternion);
+                right.y = 0; 
+                right.normalize();
+                
+                const move = new THREE.Vector3();
+                move.addScaledVector(right, xAxis * speed);
+                move.addScaledVector(forward, -yAxis * speed);
+
+                // Move the entire script container opposite to simulate walking
+                this.position.x -= move.x;
+                this.position.z -= move.z;
+
+                // Simple boundaries to keep user inside the 10x10 room
+                this.position.x = Math.max(-4.5, Math.min(4.5, this.position.x));
+                this.position.z = Math.max(-4.5, Math.min(4.5, this.position.z));
+              }
+            }
+          }
+        }
+
         update() {
+          const time = performance.now() * 0.001;
+
+          // Joystick Locomotion
+          this.handleLocomotion();
+
+          // Lava Lamp Animation
+          if (this.lavaBlobs && this.lavaBlobs.length > 0) {
+            for(let i=0; i<this.lavaBlobs.length; i++) {
+              const blob = this.lavaBlobs[i];
+              const t = time * blob.userData.speed + blob.userData.offset;
+              blob.position.y = 0.25 + (Math.sin(t) + 1) * 0.15; // Bob up and down
+              const stretch = 1.0 + Math.sin(t * 2) * 0.2;
+              blob.scale.set(1.0/stretch, stretch, 1.0/stretch); // Squish and stretch
+            }
+          }
+
+          // Proximity trigger for Taylor Swift poster playlist (-4.8, 2.2, -1.0 relative to origin)
+          if (xb.core.camera) {
+            const camPosLocal = xb.core.camera.position.clone().sub(this.position);
+            const posterPosLocal = new THREE.Vector3(-4.8, 2.2, -1.0);
+            const dist = camPosLocal.distanceTo(posterPosLocal);
+            if (dist < 2.5 && !this._taylorPlaying) {
+              this._taylorPlaying = true;
+              this.updateTvDisplay('Anti-Hero (The Eras Tour Live)', 'Taylor Swift • Pop Anthems', true);
+            } else if (dist >= 2.5 && this._taylorPlaying) {
+              this._taylorPlaying = false;
+              this.updateTvDisplay('Weightless (Calming Ambient)', 'Marconi Union • Autism Sensory Relax', false);
+            }
+          }
+
+          // Bubble Animation
           if (this.bubbleParticles && this.bubbleData && this.bubblesActive) {
-            const time = performance.now() * 0.001;
             const dummy = new THREE.Object3D();
             
             const controllerPositions = [];
             if (xb.core.input && xb.core.input.controllers) {
               for (const controller of xb.core.input.controllers) {
                 if (controller.position) {
-                  controllerPositions.push(controller.position);
+                  // Transform controller pos to local space since world is moving
+                  const localPos = controller.position.clone().sub(this.position);
+                  controllerPositions.push(localPos);
                 }
-              }
-            }
-
-            // Proximity trigger for Taylor Swift poster playlist (-4.8, 2.2, -1.0)
-            if (xb.core.camera) {
-              const camPos = xb.core.camera.position;
-              const posterPos = new THREE.Vector3(-4.8, 2.2, -1.0);
-              const dist = camPos.distanceTo(posterPos);
-              if (dist < 2.0 && !this._taylorPlaying) {
-                this._taylorPlaying = true;
-                this.updateTvDisplay('Anti-Hero (The Eras Tour Live)', 'Taylor Swift • Pop Anthems', true);
-              } else if (dist >= 2.0 && this._taylorPlaying) {
-                this._taylorPlaying = false;
-                this.updateTvDisplay('Weightless (Calming Ambient)', 'Marconi Union • Autism Sensory Relax', false);
               }
             }
 
@@ -645,6 +786,7 @@
               const wobbleZ = data.z + Math.cos(time * data.wobbleSpeed + i) * data.wobbleAmount;
 
               dummy.position.set(wobbleX, data.y, wobbleZ);
+              dummy.scale.setScalar(data.scale);
               dummy.updateMatrix();
               this.bubbleParticles.setMatrixAt(i, dummy.matrix);
             }
