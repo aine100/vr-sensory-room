@@ -43,30 +43,25 @@
           this.ambientLight = null;
           this.directionalLight = null;
           
-          // State Variables
           this.currentThemeIndex = 0;
           this.bubbleSpeedMultiplier = 1.0;
-          this.lightIntensity = 0.375;
+          this.lightIntensity = 1.0;
           this.bubblesActive = true;
           this.lampsActive = true;
 
-          // Object Collections for Interactivity and Repositioning
           this.movableObjects = [];
           this.grabbedObject = null;
           this.grabController = null;
           this.raycaster = new THREE.Raycaster();
           this.mouse = new THREE.Vector2();
 
-          // Room Dimensions
           this.roomWidth = 10;
           this.roomHeight = 4;
           this.roomDepth = 10;
 
-          // Locomotion and Turning State
           this.moveVelocity = new THREE.Vector3();
           this.keys = { w: false, a: false, s: false, d: false, q: false, e: false, arrowLeft: false, arrowRight: false };
 
-          // Audio & Spotify State
           this.audioCtx = null;
           this.isPlayingAudio = false;
           this.spotifyLoggedIn = false;
@@ -93,16 +88,6 @@
             }
           ];
 
-          // YouTube Premium State
-          this.youtubeLoggedIn = false;
-          this.currentVideoIndex = 0;
-          this.youtubeVideos = [
-            { title: "Relaxing Nature & Ocean Waves 4K", url: "https://cdn.jsdelivr.net/gh/xrblocks/assets@main/videos/duck_swimming_veo.mp4" },
-            { title: "Lofi Hip Hop Radio - Beats to Relax/Study", url: "https://cdn.jsdelivr.net/gh/xrblocks/assets@main/videos/duck_swimming_veo.mp4" },
-            { title: "Cosmic Space Ambient Journey", url: "https://cdn.jsdelivr.net/gh/xrblocks/assets@main/videos/duck_swimming_veo.mp4" }
-          ];
-
-          // Expanded color themes
           this.themes = [
             { name: 'Ocean Calm', color: 0x142850, lightColor: 0x63b3ed, bubbleColor: 0x4299e1 },
             { name: 'Forest Serenity', color: 0x123524, lightColor: 0x68d391, bubbleColor: 0x48bb78 },
@@ -128,10 +113,10 @@
           window.addEventListener('pointerdown', this.handlePointerDown);
           window.addEventListener('pointerup', this.handlePointerUp);
 
-          this.ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+          this.ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
           this.add(this.ambientLight);
 
-          this.directionalLight = new THREE.DirectionalLight(0x63b3ed, 1.2);
+          this.directionalLight = new THREE.DirectionalLight(0x63b3ed, 1.8);
           this.directionalLight.position.set(0, 6, 3);
           this.directionalLight.castShadow = true;
           this.add(this.directionalLight);
@@ -139,9 +124,9 @@
           this.createRoomEnvironment();
           this.createSensoryBubbles();
           this.createWallSpotifyPlayer();
-          this.createWallYouTubePlayer();
           this.createWallControlAndSwitches();
           this.createOvalTableAndLavaLamp();
+          this.createSpawnPoints();
 
           this.setTheme(0);
         }
@@ -219,7 +204,6 @@
           floor.receiveShadow = true;
           this.add(floor);
 
-          // Standing Lamps
           const lampPoleGeo = new THREE.CylinderGeometry(0.03, 0.03, 3.2, 16);
           const lampMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.2 });
           const shadeGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.8, 32, 1, true);
@@ -249,12 +233,12 @@
           this.add(lampGroup2);
           this.movableObjects.push(lampGroup2);
 
-          this.warmLight1 = new THREE.PointLight(0xfef08a, 1.5, 10);
+          this.warmLight1 = new THREE.PointLight(0xfef08a, 2.0, 12);
           this.warmLight1.position.set(-4.0, 2.8, 4.0);
           this.warmLight1.castShadow = true;
           this.add(this.warmLight1);
 
-          this.warmLight2 = new THREE.PointLight(0xfef08a, 1.5, 10);
+          this.warmLight2 = new THREE.PointLight(0xfef08a, 2.0, 12);
           this.warmLight2.position.set(4.0, 2.8, 4.0);
           this.warmLight2.castShadow = true;
           this.add(this.warmLight2);
@@ -406,100 +390,6 @@
           this.statusText.setText(`Loaded: ${album.artist}`);
         }
 
-        createWallYouTubePlayer() {
-          this.youtubePanel = new xb.SpatialPanel({
-            width: 2.2,
-            height: 1.4,
-            backgroundColor: '#1e1b2bfc'
-          });
-          this.youtubePanel.position.set(4.9, 1.8, 0.0);
-          this.youtubePanel.rotation.y = -Math.PI / 2;
-          this.add(this.youtubePanel);
-
-          const grid = this.youtubePanel.addGrid();
-
-          const headerRow = grid.addRow({ weight: 0.15 });
-          headerRow.addText({ text: "▶️ YouTube Premium Hub", fontColor: '#ef4444', fontSize: 0.06 });
-
-          const mainContentRow = grid.addRow({ weight: 0.65 });
-
-          const leftCol = mainContentRow.addCol({ weight: 0.5 });
-          const infoGrid = leftCol.addGrid();
-
-          this.youtubeVideoView = infoGrid.addRow({ weight: 0.75 }).addVideo();
-          this.youtubeVideoView.load(this.youtubeVideos[this.currentVideoIndex].url);
-
-          this.youtubeTrackLabel = infoGrid.addRow({ weight: 0.25 }).addText({
-            text: this.youtubeVideos[this.currentVideoIndex].title,
-            fontColor: '#ffffff',
-            fontSize: 0.04
-          });
-
-          const rightCol = mainContentRow.addCol({ weight: 0.5 });
-          const controlGrid = rightCol.addGrid();
-
-          this.ytLoginButton = controlGrid.addRow({ weight: 0.3 }).addTextButton({
-            text: "🔑 Connect YouTube Premium",
-            backgroundColor: '#dc2626',
-            fontColor: '#ffffff',
-            fontSize: 0.15
-          });
-          this.ytLoginButton.onTriggered = () => {
-            this.youtubeLoggedIn = !this.youtubeLoggedIn;
-            this.ytLoginButton.setText(this.youtubeLoggedIn ? "✅ YT Premium Active" : "🔑 Connect YouTube Premium");
-            this.ytStatusText.setText(this.youtubeLoggedIn ? "YouTube Premium Account Linked!" : "Logged Out");
-          };
-
-          const videoBrowseRow = controlGrid.addRow({ weight: 0.3 });
-          const prevVideoBtn = videoBrowseRow.addCol({ weight: 0.5 }).addTextButton({
-            text: "◀ Prev Video",
-            backgroundColor: '#334155',
-            fontColor: '#ffffff',
-            fontSize: 0.15
-          });
-          prevVideoBtn.onTriggered = () => {
-            this.currentVideoIndex = (this.currentVideoIndex - 1 + this.youtubeVideos.length) % this.youtubeVideos.length;
-            this.updateYouTubeDisplay();
-          };
-
-          const nextVideoBtn = videoBrowseRow.addCol({ weight: 0.5 }).addTextButton({
-            text: "Next Video ▶",
-            backgroundColor: '#334155',
-            fontColor: '#ffffff',
-            fontSize: 0.15
-          });
-          nextVideoBtn.onTriggered = () => {
-            this.currentVideoIndex = (this.currentVideoIndex + 1) % this.youtubeVideos.length;
-            this.updateYouTubeDisplay();
-          };
-
-          this.ytStatusText = controlGrid.addRow({ weight: 0.4 }).addText({
-            text: "Browse playlists & watch in 3D",
-            fontColor: '#94a3b8',
-            fontSize: 0.04
-          });
-
-          const footerRow = grid.addRow({ weight: 0.2 });
-          const ytPlayBtn = footerRow.addCol({ weight: 1.0 }).addTextButton({
-            text: "▶ Play / Pause YouTube Stream",
-            backgroundColor: '#b91c1c',
-            fontColor: '#ffffff',
-            fontSize: 0.14
-          });
-          ytPlayBtn.onTriggered = () => {
-            this.ytStatusText.setText(this.youtubeLoggedIn ? "Streaming YouTube Content..." : "Please Connect YT Premium First");
-          };
-
-          this.youtubePanel.updateLayouts();
-        }
-
-        updateYouTubeDisplay() {
-          const video = this.youtubeVideos[this.currentVideoIndex];
-          this.youtubeVideoView.load(video.url);
-          this.youtubeTrackLabel.setText(video.title);
-          this.ytStatusText.setText(`Loaded: ${video.title}`);
-        }
-
         createWallControlAndSwitches() {
           this.ctrlPanel = new xb.SpatialPanel({
             width: 1.2,
@@ -553,7 +443,7 @@
           });
           lampToggleBtn.onTriggered = () => {
             this.lampsActive = !this.lampsActive;
-            for (let l of this.lampLightList) l.intensity = this.lampsActive ? 1.5 : 0.0;
+            for (let l of this.lampLightList) l.intensity = this.lampsActive ? 2.0 : 0.0;
           };
 
           this.ctrlPanel.updateLayouts();
@@ -599,13 +489,31 @@
           glass.position.y = 0.3;
           this.lavaGroup.add(glass);
 
-          this.lavaLight = new THREE.PointLight(0xf43f5e, 1.5, 4);
+          this.lavaLight = new THREE.PointLight(0xf43f5e, 2.0, 5);
           this.lavaLight.position.y = 0.3;
           this.lavaGroup.add(this.lavaLight);
           this.lampLightList.push(this.lavaLight);
 
           this.lavaGroup.position.set(0.0, 0.48, 0);
           tableGroup.add(this.lavaGroup);
+        }
+
+        createSpawnPoints() {
+          const padGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.02, 32);
+          
+          const mat1 = new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7, roughness: 0.3 });
+          const pad1 = new THREE.Mesh(padGeo, mat1);
+          pad1.position.set(0, 0.02, -2.5);
+          pad1.userData = { targetPos: new THREE.Vector3(0, 1.6, -1.5), name: "Spotify TV View" };
+          this.add(pad1);
+          this.movableObjects.push(pad1);
+
+          const mat2 = new THREE.MeshStandardMaterial({ color: 0x34d399, emissive: 0x059669, roughness: 0.3 });
+          const pad2 = new THREE.Mesh(padGeo, mat2);
+          pad2.position.set(0, 0.02, 1.0);
+          pad2.userData = { targetPos: new THREE.Vector3(0, 1.6, 2.0), name: "Center Room" };
+          this.add(pad2);
+          this.movableObjects.push(pad2);
         }
 
         setTheme(index) {
@@ -622,9 +530,9 @@
         }
 
         cycleLightIntensity() {
-          this.lightIntensity = this.lightIntensity === 0.375 ? 0.65 : 
-                                this.lightIntensity === 0.65 ? 1.00 : 0.375;
-          this.directionalLight.intensity = this.lightIntensity * 1.5;
+          this.lightIntensity = this.lightIntensity === 1.0 ? 1.5 : 
+                                this.lightIntensity === 1.5 ? 2.0 : 1.0;
+          this.directionalLight.intensity = this.lightIntensity * 1.8;
         }
 
         toggleAudio() {
