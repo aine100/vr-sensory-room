@@ -46,16 +46,14 @@
           // State Variables
           this.currentThemeIndex = 0;
           this.bubbleSpeedMultiplier = 1.0;
-          this.lightIntensity = 2.0;
+          this.lightIntensity = 1.5; // Reduced light influence by half
           this.bubblesActive = true;
           this.lampsActive = true;
-          this._taylorPlaying = false;
 
-          this.tempLabels = []; // Added to track and orient temporary labels
+          this.tempLabels = []; // Track temporary labels
 
-          // Object Collections for Interactivity
+          // Object Collections for Interactivity and Collision
           this.movableObjects = [];
-          this.collidableBoxes = [];
           this.grabbedObject = null;
           this.grabController = null;
           this.grabOffset = new THREE.Vector3();
@@ -104,11 +102,10 @@
             xb.core.input.raycaster.sortFunction = raycastSortFunction;
           }
 
-          // Keyboard listeners for desktop locomotion
           window.addEventListener('keydown', this.handleKeyDown);
           window.addEventListener('keyup', this.handleKeyUp);
 
-          this.ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+          this.ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
           this.add(this.ambientLight);
 
           this.directionalLight = new THREE.DirectionalLight(0x63b3ed, this.lightIntensity);
@@ -124,7 +121,6 @@
           this.createSketchfabCouch();
           this.createOvalTableAndLavaLamp();
 
-          // Set initial theme
           this.setTheme(0);
         }
 
@@ -143,9 +139,8 @@
         }
 
         createRoomEnvironment() {
-          // White walls to reflect lamp colors
           const wallMaterial = new THREE.MeshStandardMaterial({
-            color: 0xf8fafc,
+            color: 0xf8fafc, // Bright soothing white walls
             roughness: 0.9,
             metalness: 0.05,
             side: THREE.BackSide
@@ -157,7 +152,6 @@
           this.roomMesh = roomMesh;
           this.add(roomMesh);
 
-          // Plain dark floor to reduce visual noise
           const floorGeometry = new THREE.PlaneGeometry(this.roomWidth, this.roomDepth);
           const floorMaterial = new THREE.MeshStandardMaterial({
             color: 0x0f172a,
@@ -166,16 +160,13 @@
           });
           const floor = new THREE.Mesh(floorGeometry, floorMaterial);
           floor.rotation.x = -Math.PI / 2;
-          // Slight offset to prevent z-fighting flicker
-          floor.position.y = 0.01;
+          floor.position.y = 0.01; // Avoid z-fighting flicker in VR
           floor.receiveShadow = true;
           this.add(floor);
 
-          // Modern Cylindrical Standing Floor Lamps
+          // Cylindrical Standing Floor Lamps
           const lampPoleGeo = new THREE.CylinderGeometry(0.03, 0.03, 3.2, 16);
           const lampMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.2 });
-          
-          // Cylindrical open-ended shades
           const shadeGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.8, 32, 1, true);
           const shadeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.DoubleSide, roughness: 0.4 });
 
@@ -205,65 +196,21 @@
           this.movableObjects.push(lampGroup2);
           this.addLabel('Right Lamp', lampGroup2, 3.8);
 
-          // High intensity point lights to influence the white walls (Reduced influence by half)
-          this.warmLight1 = new THREE.PointLight(0xfef08a, 2.0, 10);
+          // Point lights for lamps (moderated intensity)
+          this.warmLight1 = new THREE.PointLight(0xfef08a, 1.2, 8);
           this.warmLight1.position.set(-4.0, 2.8, 4.0);
           this.warmLight1.castShadow = true;
           this.add(this.warmLight1);
 
-          this.warmLight2 = new THREE.PointLight(0xfef08a, 2.0, 10);
+          this.warmLight2 = new THREE.PointLight(0xfef08a, 1.2, 8);
           this.warmLight2.position.set(4.0, 2.8, 4.0);
           this.warmLight2.castShadow = true;
           this.add(this.warmLight2);
 
           this.lampLightList = [this.warmLight1, this.warmLight2];
-
-          // Scenic Relaxing Window (Back wall center)
-          const windowGeo = new THREE.PlaneGeometry(2.2, 2.6);
-          const wCanvas = document.createElement('canvas');
-          wCanvas.width = 1024;
-          wCanvas.height = 1024;
-          const viewCtx = wCanvas.getContext('2d');
-          
-          const grad = viewCtx.createLinearGradient(0, 0, 0, 1024);
-          grad.addColorStop(0, '#3b82f6');
-          grad.addColorStop(0.5, '#f43f5e');
-          grad.addColorStop(1, '#f59e0b');
-          viewCtx.fillStyle = grad;
-          viewCtx.fillRect(0, 0, 1024, 1024);
-
-          viewCtx.fillStyle = '#fef08a';
-          viewCtx.beginPath();
-          viewCtx.arc(512, 512, 120, 0, Math.PI * 2);
-          viewCtx.fill();
-
-          viewCtx.fillStyle = '#0f172a';
-          viewCtx.beginPath();
-          viewCtx.moveTo(0, 1024);
-          viewCtx.lineTo(0, 700);
-          viewCtx.lineTo(300, 500);
-          viewCtx.lineTo(600, 650);
-          viewCtx.lineTo(1024, 450);
-          viewCtx.lineTo(1024, 1024);
-          viewCtx.fill();
-
-          const windowTexture = new THREE.CanvasTexture(wCanvas);
-          const windowMat = new THREE.MeshBasicMaterial({ map: windowTexture });
-          const windowMesh = new THREE.Mesh(windowGeo, windowMat);
-          // Moved to right side of front wall
-          windowMesh.position.set(2.5, 2.2, -4.95);
-          this.add(windowMesh);
-
-          const frameGeo = new THREE.BoxGeometry(2.4, 2.8, 0.1);
-          const frameMat = new THREE.MeshStandardMaterial({ color: '#1e293b', roughness: 0.4 });
-          const frameMesh = new THREE.Mesh(frameGeo, frameMat);
-          frameMesh.position.set(2.5, 2.2, -4.95);
-          this.add(frameMesh);
-          this.addLabel('Scenic Window', frameMesh, 1.6);
         }
 
         async createSketchfabCouch() {
-          // Fallback Couch
           this.couchGroup = new THREE.Group();
           const fabricMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.7 });
           
@@ -291,16 +238,13 @@
           rightArm.castShadow = true;
           this.couchGroup.add(rightArm);
 
-          // Position safely inside the room against the back wall, facing forward
           this.couchGroup.position.set(0, 0.01, 3.5);
           this.couchGroup.rotation.y = Math.PI; // Face front
           
-          // Make interactive
           this.add(this.couchGroup);
           this.movableObjects.push(this.couchGroup);
           this.couchLabel = this.addLabel('Sofa / Couch', this.couchGroup, 1.2);
 
-          // Try loading user's custom GLB
           try {
             const sofa = new xb.ModelViewer({});
             await sofa.loadGLTFModel({
@@ -313,44 +257,37 @@
               renderer: xb.core.renderer,
             });
 
-            // Ensure matrices are updated before calculating the bounding box
             sofa.updateMatrixWorld(true);
-
-            // Automatically calculate size and adjust it to exactly 1.7 meters wide
             const box = new THREE.Box3().setFromObject(sofa);
             const size = box.getSize(new THREE.Vector3());
-            const targetWidth = 1.7;
+            
+            // Increased couch size slightly as requested (~1.9 meters wide)
+            const targetWidth = 1.9;
             if (size.x > 0) {
               const scaleFactor = targetWidth / size.x;
               sofa.scale.setScalar(scaleFactor);
               sofa.updateMatrixWorld(true);
             }
 
-            // Recalculate box after scaling to find exact floor center
             const newBox = new THREE.Box3().setFromObject(sofa);
             const center = newBox.getCenter(new THREE.Vector3());
             
-            // Center it on X and Z, place lowest point perfectly on the floor
             sofa.position.x -= center.x;
             sofa.position.z -= center.z;
             sofa.position.y -= newBox.min.y;
             
-            // Move back into the previous correct location inside the room
             const finalCouchGroup = new THREE.Group();
             finalCouchGroup.add(sofa);
             finalCouchGroup.position.set(0, 0.01, 3.5);
-            finalCouchGroup.rotation.y = Math.PI; // face front
+            finalCouchGroup.rotation.y = Math.PI;
 
-            // Swap fallback with real model
             this.remove(this.couchGroup);
             this.movableObjects = this.movableObjects.filter(obj => obj !== this.couchGroup);
             
             this.couchGroup = finalCouchGroup;
             this.add(this.couchGroup);
             this.movableObjects.push(this.couchGroup);
-            this.couchGroup.add(this.couchLabel); // Transfer label to the custom 3D model
-            
-            console.log('Custom Sketchfab sofa loaded, scaled, and grounded!');
+            this.couchGroup.add(this.couchLabel);
           } catch (e) {
             console.warn('Using built-in cozy sofa model.');
           }
@@ -359,9 +296,9 @@
         createOvalTableAndLavaLamp() {
           this.tableGroup = new THREE.Group();
           
-          // Oval Top
+          // Oval Coffee Table
           const tableTopGeo = new THREE.CylinderGeometry(0.6, 0.6, 0.05, 32);
-          tableTopGeo.scale(1.8, 1.0, 1.0); // Scale X to create a smooth oval shape
+          tableTopGeo.scale(1.8, 1.0, 1.0);
           const tableMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.6, metalness: 0.2 });
           const tableTop = new THREE.Mesh(tableTopGeo, tableMat);
           tableTop.position.y = 0.45;
@@ -369,15 +306,12 @@
           tableTop.receiveShadow = true;
           this.tableGroup.add(tableTop);
 
-          // Table Legs
           const legGeo = new THREE.CylinderGeometry(0.03, 0.02, 0.45, 16);
           const legMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8, roughness: 0.2 });
-          
           const legPositions = [
             [-0.7, 0.225, -0.3], [0.7, 0.225, -0.3],
             [-0.7, 0.225, 0.3], [0.7, 0.225, 0.3]
           ];
-
           legPositions.forEach(pos => {
             const leg = new THREE.Mesh(legGeo, legMat);
             leg.position.set(...pos);
@@ -385,7 +319,7 @@
             this.tableGroup.add(leg);
           });
 
-          // Move Table in front of the couch
+          // Placed directly in front of the couch in the center
           this.tableGroup.position.set(0, 0.01, 1.5);
           this.add(this.tableGroup);
           this.movableObjects.push(this.tableGroup);
@@ -412,7 +346,6 @@
           topMesh.position.y = 0.5;
           this.lavaGroup.add(topMesh);
 
-          // Lava blobs
           this.lavaBlobs = [];
           this.lavaMat = new THREE.MeshStandardMaterial({ color: 0x4299e1, emissive: 0x4299e1, emissiveIntensity: 0.8, roughness: 0.2 });
           const blobGeo = new THREE.SphereGeometry(0.03, 16, 16);
@@ -427,12 +360,11 @@
             this.lavaBlobs.push(blob);
           }
 
-          this.lavaLight = new THREE.PointLight(0x4299e1, 1.5, 3);
+          this.lavaLight = new THREE.PointLight(0x4299e1, 1.0, 3);
           this.lavaLight.position.y = 0.3;
           this.lavaGroup.add(this.lavaLight);
           this.lampLightList.push(this.lavaLight);
 
-          // Sit lava lamp on the table
           this.lavaGroup.position.set(0.6, 0.475, 0); 
           this.tableGroup.add(this.lavaGroup);
           this.addLabel('Lava Lamp', this.lavaGroup, 0.7);
@@ -535,7 +467,6 @@
             return new THREE.CanvasTexture(c);
           };
 
-          // Buttons configured for the left wall
           const btnData = [
             { id: 'toggle_bubbles', text: '🫧 BUBBLES', color: '#10b981', z: 1.5 },
             { id: 'speed', text: '🫧 SPEED', color: '#38bdf8', z: 0.75 },
@@ -548,7 +479,6 @@
             const tex = createHighResBtn(btn.text, '#1e293b', btn.color);
             const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.2 });
             const mesh = new THREE.Mesh(switchGeo, mat);
-            // Placed on left wall
             mesh.position.set(-4.95, 2.4, btn.z);
             mesh.rotation.y = Math.PI / 2;
             mesh.userData = { action: btn.id };
@@ -596,7 +526,6 @@
           const posterMat = new THREE.MeshStandardMaterial({ roughness: 0.2 });
           const posterMesh = new THREE.Mesh(posterGeo, posterMat);
           
-          // Positioned on the right wall
           posterMesh.position.set(4.95, 2.2, 0.0);
           posterMesh.rotation.y = -Math.PI / 2;
           this.taylorPosterMesh = posterMesh;
@@ -627,8 +556,8 @@
         }
 
         createSensoryBubbles() {
-          const particleCount = 60; // Reduced for organic feel
-          const geometry = new THREE.SphereGeometry(1.0, 16, 16); // Base size 1, scaled per instance
+          const particleCount = 60;
+          const geometry = new THREE.SphereGeometry(1.0, 16, 16);
           const material = new THREE.MeshStandardMaterial({
             color: 0xffffff,
             transparent: true,
@@ -653,14 +582,13 @@
               z = (Math.random() - 0.5) * 8;
               valid = true;
               for(const p of positions) {
-                if (p.distanceTo(new THREE.Vector3(x,y,z)) < 0.7) { valid = false; break; }
+                if (p.distanceTo(new THREE.Vector3(x,y,z)) < 0.8) { valid = false; break; }
               }
               attempts++;
             } while(!valid && attempts < 50);
             
             positions.push(new THREE.Vector3(x,y,z));
             
-            // Random scales between 0.03 and 0.12
             const scale = 0.03 + Math.random() * 0.09;
             dummy.position.set(x, y, z);
             dummy.scale.set(scale, scale, scale);
@@ -681,7 +609,6 @@
           this.bubbleParticles.instanceMatrix.needsUpdate = true;
           this.add(this.bubbleParticles);
 
-          // Add a central label for the bubble field
           const bubbleCenter = new THREE.Group();
           bubbleCenter.position.set(0, 3.5, 0);
           this.add(bubbleCenter);
@@ -706,14 +633,12 @@
           this.roomMesh.material.color.setHex(theme.color);
           this.directionalLight.color.setHex(theme.lightColor);
           
-          // Update lamp lights to match theme tightly
           if (this.warmLight1) this.warmLight1.color.setHex(theme.lightColor);
           if (this.warmLight2) this.warmLight2.color.setHex(theme.lightColor);
           if (this.lavaLight) this.lavaLight.color.setHex(theme.bubbleColor);
           if (this.lavaMat) this.lavaMat.color.setHex(theme.bubbleColor);
           if (this.lavaMat) this.lavaMat.emissive.setHex(theme.bubbleColor);
 
-          // Update bubble hues organically based on theme
           if (this.bubbleParticles) {
             const baseColor = new THREE.Color(theme.bubbleColor);
             const hsl = { h: 0, s: 0, l: 0 };
@@ -721,8 +646,8 @@
             
             const tmpColor = new THREE.Color();
             for(let i=0; i < this.bubbleData.length; i++) {
-              const hOffset = (Math.random() - 0.5) * 0.15; // Shift hue slightly
-              const lOffset = (Math.random() - 0.5) * 0.2;  // Shift lightness
+              const hOffset = (Math.random() - 0.5) * 0.15;
+              const lOffset = (Math.random() - 0.5) * 0.2;
               tmpColor.setHSL(
                 (hsl.h + hOffset + 1.0) % 1.0, 
                 Math.min(1, Math.max(0, hsl.s)), 
@@ -746,15 +671,14 @@
         }
 
         cycleLightIntensity() {
-          this.lightIntensity = this.lightIntensity === 2.0 ? 1.0 : 
-                                this.lightIntensity === 1.0 ? 3.0 : 2.0;
+          this.lightIntensity = this.lightIntensity === 1.5 ? 0.8 : 
+                                this.lightIntensity === 0.8 ? 2.2 : 1.5;
           this.directionalLight.intensity = this.lightIntensity;
         }
 
         onSelectStart(event) {
           const controller = event.target;
           
-          // 1. Check UI Switches
           const switches = this.children.filter(c => c.userData && c.userData.action);
           for (const sw of switches) {
             const intersection = xb.core.user.select(sw, controller);
@@ -768,27 +692,23 @@
                 const idx = Math.min(5, Math.floor(intersection.uv.x * 6));
                 this.setTheme(idx);
               }
-              return; // Handled UI
+              return;
             }
           }
 
-          // 2. Check Movable Furniture
           for(const obj of this.movableObjects) {
              const hit = xb.core.user.select(obj, controller);
              if (hit) {
                this.grabbedObject = obj;
                this.grabController = controller;
                
-               // Calculate offset from controller ray to object origin
                const ray = new THREE.Ray();
                const mat = new THREE.Matrix4().identity().extractRotation(controller.matrixWorld);
                ray.origin.setFromMatrixPosition(controller.matrixWorld);
                ray.direction.set(0, 0, -1).applyMatrix4(mat);
                
-               // Approximate distance
                const dist = ray.origin.distanceTo(obj.position);
                const grabPoint = ray.origin.clone().add(ray.direction.multiplyScalar(dist));
-               
                this.grabOffset.copy(obj.position).sub(grabPoint);
                return;
              }
@@ -802,15 +722,11 @@
              ray.origin.setFromMatrixPosition(this.grabController.matrixWorld);
              ray.direction.set(0, 0, -1).applyMatrix4(mat);
              
-             // Keep object at rough ground level while dragging
              const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.01);
              const intersectPoint = new THREE.Vector3();
-             
-             // Cast ray downward slightly to hit floor, or just project distance
              ray.intersectPlane(floorPlane, intersectPoint);
              
              if (intersectPoint) {
-                // Keep the Y locked to initial so it slides!
                 const origY = this.grabbedObject.position.y;
                 this.grabbedObject.position.copy(intersectPoint).add(this.grabOffset);
                 this.grabbedObject.position.y = origY;
@@ -829,7 +745,6 @@
           const time = performance.now() * 0.001;
           const dt = xb.getDeltaTime() || 0.016;
 
-          // Billboarding: Make all temporary labels face the user's camera
           if (xb.core.camera && this.tempLabels) {
             const camPos = xb.core.camera.position;
             for (const label of this.tempLabels) {
@@ -837,7 +752,6 @@
             }
           }
 
-          // Process Locomotion (Desktop Keyboard + VR Thumbsticks)
           this.moveVelocity.set(0,0,0);
           const speed = 2.0 * dt;
 
@@ -850,32 +764,26 @@
           if (session) {
              for (const source of session.inputSources) {
                  if (source.gamepad && source.gamepad.axes.length >= 4) {
-                     // Deadzone check
                      if (Math.abs(source.gamepad.axes[2]) > 0.1) this.moveVelocity.x += source.gamepad.axes[2] * speed;
                      if (Math.abs(source.gamepad.axes[3]) > 0.1) this.moveVelocity.z += source.gamepad.axes[3] * speed;
                  }
              }
           }
 
-          // Apply Locomotion & Bounding Box Collision
           if (this.moveVelocity.lengthSq() > 0) {
              const userRig = xb.core.camera; 
-             // Determine proposed new position
              const proposedPos = userRig.position.clone().add(this.moveVelocity);
              
-             // Build player bounding box (approximate)
              const playerBox = new THREE.Box3();
              playerBox.min.set(proposedPos.x - 0.3, 0, proposedPos.z - 0.3);
              playerBox.max.set(proposedPos.x + 0.3, 2.0, proposedPos.z + 0.3);
 
              let collision = false;
              
-             // 1. Room bounds collision
              if (proposedPos.x < -4.5 || proposedPos.x > 4.5 || proposedPos.z < -4.5 || proposedPos.z > 4.5) {
                 collision = true;
              }
 
-             // 2. Furniture bounds collision
              if (!collision) {
                for(const obj of this.movableObjects) {
                  const objBox = new THREE.Box3().setFromObject(obj);
@@ -886,15 +794,11 @@
                }
              }
 
-             // In a single-file custom rig, modifying the group holding the room
-             // creates the illusion of movement without breaking WebXR.
-             // We move the entire room oppositely!
              if (!collision) {
                this.position.sub(this.moveVelocity);
              }
           }
 
-          // Animate Lava Lamp
           if (this.lavaBlobs && this.lampsActive) {
             this.lavaBlobs.forEach((blob) => {
               const d = blob.userData;
@@ -903,7 +807,6 @@
             });
           }
 
-          // Animate Bubbles
           if (this.bubbleParticles && this.bubbleData && this.bubblesActive) {
             const dummy = new THREE.Object3D();
             
@@ -927,22 +830,6 @@
               this.bubbleParticles.setMatrixAt(i, dummy.matrix);
             }
             this.bubbleParticles.instanceMatrix.needsUpdate = true;
-          }
-
-          // Taylor Swift Proximity Trigger (Right Wall x = 4.95)
-          if (xb.core.camera) {
-            // Because we move the room via `this.position`, we must check relative distance
-            const camLocalPos = xb.core.camera.position.clone().sub(this.position);
-            const posterPos = new THREE.Vector3(4.95, 2.2, 0.0);
-            const dist = camLocalPos.distanceTo(posterPos);
-            
-            if (dist < 2.5 && !this._taylorPlaying) {
-              this._taylorPlaying = true;
-              this.updateTvDisplay('Anti-Hero (The Eras Tour Live)', 'Taylor Swift • Pop Anthems', true);
-            } else if (dist >= 2.5 && this._taylorPlaying) {
-              this._taylorPlaying = false;
-              this.updateTvDisplay('Weightless (Calming Ambient)', 'Marconi Union • Autism Sensory Relax', false);
-            }
           }
         }
       }
