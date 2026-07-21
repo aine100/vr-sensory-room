@@ -427,7 +427,7 @@
           const infoGrid = leftCol.addGrid();
 
           this.youtubeVideoView = infoGrid.addRow({ weight: 0.75 }).addVideo();
-          this.youtubeVideoView.load({ src: this.youtubeVideos[this.currentVideoIndex].url });
+          this.youtubeVideoView.load(this.youtubeVideos[this.currentVideoIndex].url);
 
           this.youtubeTrackLabel = infoGrid.addRow({ weight: 0.25 }).addText({
             text: this.youtubeVideos[this.currentVideoIndex].title,
@@ -495,7 +495,7 @@
 
         updateYouTubeDisplay() {
           const video = this.youtubeVideos[this.currentVideoIndex];
-          this.youtubeVideoView.load({ src: video.url });
+          this.youtubeVideoView.load(video.url);
           this.youtubeTrackLabel.setText(video.title);
           this.ytStatusText.setText(`Loaded: ${video.title}`);
         }
