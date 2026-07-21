@@ -142,27 +142,11 @@
           this.roomMesh = roomMesh;
           this.add(roomMesh);
 
-          const floorCanvas = document.createElement('canvas');
-          floorCanvas.width = 512;
-          floorCanvas.height = 512;
-          const fCtx = floorCanvas.getContext('2d');
-          fCtx.fillStyle = '#0f172a';
-          fCtx.fillRect(0, 0, 512, 512);
-          fCtx.strokeStyle = '#1e293b';
-          fCtx.lineWidth = 4;
-          for(let y=0; y<=512; y+=64) {
-            fCtx.beginPath(); fCtx.moveTo(0, y); fCtx.lineTo(512, y); fCtx.stroke();
-          }
-          const floorTexture = new THREE.CanvasTexture(floorCanvas);
-          floorTexture.wrapS = THREE.RepeatWrapping;
-          floorTexture.wrapT = THREE.RepeatWrapping;
-          floorTexture.repeat.set(6, 6);
-
           const floorGeometry = new THREE.PlaneGeometry(roomWidth, roomDepth);
           const floorMaterial = new THREE.MeshStandardMaterial({
-            map: floorTexture,
-            roughness: 0.6,
-            metalness: 0.1
+            color: 0x0f172a, // Clean, plain dark base
+            roughness: 0.8,
+            metalness: 0.05
           });
           const floor = new THREE.Mesh(floorGeometry, floorMaterial);
           floor.rotation.x = -Math.PI / 2;
@@ -173,8 +157,16 @@
           // Realistic 3D Standing Floor Lamps
           const lampPoleGeo = new THREE.CylinderGeometry(0.03, 0.03, 3.2, 16);
           const lampMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.2 });
-          const shadeGeo = new THREE.ConeGeometry(0.35, 0.6, 32);
-          const shadeMat = new THREE.MeshStandardMaterial({ color: 0xfef08a, emissive: 0xfef08a, emissiveIntensity: 0.6, roughness: 0.1 });
+          
+          // Modern cylindrical lamp shades
+          const shadeGeo = new THREE.CylinderGeometry(0.3, 0.35, 0.6, 32, 1, true);
+          const shadeMat = new THREE.MeshStandardMaterial({ 
+            color: 0xfef08a, 
+            emissive: 0xfef08a, 
+            emissiveIntensity: 0.6, 
+            roughness: 0.1,
+            side: THREE.DoubleSide
+          });
 
           const lampGroup1 = new THREE.Group();
           const pole1 = new THREE.Mesh(lampPoleGeo, lampMat);
