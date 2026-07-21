@@ -46,7 +46,7 @@
           // State Variables
           this.currentThemeIndex = 0;
           this.bubbleSpeedMultiplier = 1.0;
-          this.lightIntensity = 0.375; // Reduced light influence by half from original 0.75
+          this.lightIntensity = 0.1875; // Reduced light influence by half from original 0.375
           this.bubblesActive = true;
           this.lampsActive = true;
 
@@ -64,6 +64,11 @@
           // Locomotion and turning state
           this.moveVelocity = new THREE.Vector3();
           this.keys = { w: false, a: false, s: false, d: false, q: false, e: false, arrowLeft: false, arrowRight: false };
+
+          // Audio state
+          this.audioCtx = null;
+          this.isPlayingAudio = false;
+          this.synthNodes = null;
 
           // Expanded color themes for rich environmental mood selection
           this.themes = [
@@ -181,12 +186,12 @@
           this.add(lampGroup2);
           this.movableObjects.push(lampGroup2);
 
-          this.warmLight1 = new THREE.PointLight(0xfef08a, 0.3, 8);
+          this.warmLight1 = new THREE.PointLight(0xfef08a, 0.4, 8);
           this.warmLight1.position.set(-4.0, 2.8, 4.0);
           this.warmLight1.castShadow = true;
           this.add(this.warmLight1);
 
-          this.warmLight2 = new THREE.PointLight(0xfef08a, 0.3, 8);
+          this.warmLight2 = new THREE.PointLight(0xfef08a, 0.4, 8);
           this.warmLight2.position.set(4.0, 2.8, 4.0);
           this.warmLight2.castShadow = true;
           this.add(this.warmLight2);
@@ -198,14 +203,14 @@
           this.couchGroup = new THREE.Group();
           const fabricMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.7 });
           
-          const seatGeo = new THREE.BoxGeometry(1.6, 0.35, 0.8);
+          const seatGeo = new THREE.BoxGeometry(1.7, 0.35, 0.8);
           const seat = new THREE.Mesh(seatGeo, fabricMat);
           seat.position.y = 0.35;
           seat.castShadow = true;
           seat.receiveShadow = true;
           this.couchGroup.add(seat);
 
-          const backGeo = new THREE.BoxGeometry(1.6, 0.8, 0.25);
+          const backGeo = new THREE.BoxGeometry(1.7, 0.8, 0.25);
           const back = new THREE.Mesh(backGeo, fabricMat);
           back.position.set(0, 0.75, -0.3);
           back.castShadow = true;
@@ -213,16 +218,15 @@
 
           const armGeo = new THREE.BoxGeometry(0.25, 0.6, 0.85);
           const leftArm = new THREE.Mesh(armGeo, fabricMat);
-          leftArm.position.set(-0.9, 0.5, 0);
+          leftArm.position.set(-0.95, 0.5, 0);
           leftArm.castShadow = true;
           this.couchGroup.add(leftArm);
 
           const rightArm = new THREE.Mesh(armGeo, fabricMat);
-          rightArm.position.set(0.9, 0.5, 0);
+          rightArm.position.set(0.95, 0.5, 0);
           rightArm.castShadow = true;
           this.couchGroup.add(rightArm);
 
-          // Positioned safely against the back wall, facing forward
           this.couchGroup.position.set(0, 0.01, 3.8);
           this.couchGroup.rotation.y = Math.PI;
           
@@ -245,8 +249,7 @@
             const box = new THREE.Box3().setFromObject(sofa);
             const size = box.getSize(new THREE.Vector3());
             
-            // Increased sofa size slightly per request (~1.7 meters wide)
-            const targetWidth = 1.7;
+            const targetWidth = 1.7 * (2/3); // two thirds size as requested earlier
             if (size.x > 0) {
               const scaleFactor = targetWidth / size.x;
               sofa.scale.setScalar(scaleFactor);
@@ -301,7 +304,6 @@
             this.tableGroup.add(leg);
           });
 
-          // Placed centrally in front of the couch
           this.tableGroup.position.set(0, 0.01, 2.2);
           this.add(this.tableGroup);
           this.movableObjects.push(this.tableGroup);
@@ -340,12 +342,12 @@
             this.lavaBlobs.push(blob);
           }
 
-          this.lavaLight = new THREE.PointLight(0x4299e1, 0.25, 3);
+          this.lavaLight = new THREE.PointLight(0x4299e1, 0.2, 3);
           this.lavaLight.position.y = 0.3;
           this.lavaGroup.add(this.lavaLight);
           this.lampLightList.push(this.lavaLight);
 
-          this.lavaGroup.position.set(0.6, 0.475, 0); 
+          this.lavaGroup.position.set(0.0, 0.475, 0); 
           this.tableGroup.add(this.lavaGroup);
         }
 
@@ -373,28 +375,29 @@
           const screenMat = new THREE.MeshBasicMaterial({ map: texture });
           const screenMesh = new THREE.Mesh(screenGeo, screenMat);
           screenMesh.position.z = 0.042;
+          this.tvScreenMesh = screenMesh;
           tvGroup.add(screenMesh);
 
-          // Perfectly centered on the front wall
           tvGroup.position.set(0, 2.2, -4.95);
           this.add(tvGroup);
+          this.movableObjects.push(tvGroup);
         }
 
-        updateTvDisplay(trackTitle, artist, isTaylorPlaylist) {
+        updateTvDisplay(trackTitle, artist, isPlaying) {
           const ctx = this.tvCtx;
           ctx.fillStyle = '#121212';
           ctx.fillRect(0, 0, 1280, 720);
 
           ctx.fillStyle = '#1db954';
           ctx.font = 'bold 48px Inter, sans-serif';
-          ctx.fillText(isTaylorPlaylist ? 'Spotify • Taylor Swift Playlist' : 'Spotify Connected TV', 80, 100);
+          ctx.fillText('Spotify Connected TV', 80, 100);
 
-          ctx.fillStyle = isTaylorPlaylist ? '#f43f5e' : '#282828';
+          ctx.fillStyle = '#282828';
           ctx.fillRect(80, 150, 220, 220);
           ctx.fillStyle = '#ffffff';
           ctx.font = 'bold 72px Inter, sans-serif';
           ctx.textAlign = 'center';
-          ctx.fillText(isTaylorPlaylist ? '★' : '♫', 190, 290);
+          ctx.fillText('♫', 190, 290);
           ctx.textAlign = 'left';
 
           ctx.fillStyle = '#ffffff';
@@ -408,7 +411,7 @@
           ctx.fillStyle = '#535353';
           ctx.fillRect(80, 460, 1120, 16);
           ctx.fillStyle = '#1db954';
-          ctx.fillRect(80, 460, isTaylorPlaylist ? 840 : 480, 16);
+          ctx.fillRect(80, 460, isPlaying ? 640 : 0, 16);
 
           ctx.fillStyle = '#a7a7a7';
           ctx.font = '28px Inter, sans-serif';
@@ -417,11 +420,67 @@
 
           ctx.fillStyle = '#ffffff';
           ctx.font = '44px Inter, sans-serif';
-          ctx.fillText('⏮       ▶ (Playing)       ⏭       🔊', 400, 630);
+          ctx.fillText(isPlaying ? '⏮       ⏸ (Pause Audio)       ⏭       🔊' : '⏮       ▶ (Click TV to Play)       ⏭       🔇', 320, 630);
 
           if (this.tvTexture) {
             this.tvTexture.needsUpdate = true;
           }
+        }
+
+        toggleAudio() {
+          if (!this.audioCtx) {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            this.audioCtx = new AudioContext();
+          }
+          if (this.audioCtx.state === 'suspended') {
+            this.audioCtx.resume();
+          }
+          this.isPlayingAudio = !this.isPlayingAudio;
+          if (this.isPlayingAudio) {
+            this.startAmbientSound();
+            this.updateTvDisplay('Weightless (Calming Ambient)', 'Marconi Union', true);
+          } else {
+            this.stopAmbientSound();
+            this.updateTvDisplay('Weightless (Calming Ambient)', 'Marconi Union', false);
+          }
+        }
+
+        startAmbientSound() {
+          if (this.synthNodes) return;
+          const ctx = this.audioCtx;
+          const freqs = [87.31, 130.81, 164.81, 196.00, 246.94, 293.66]; // Fmaj9 / C ambient chord
+          this.synthNodes = freqs.map(freq => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            const filter = ctx.createBiquadFilter();
+            
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            
+            filter.type = 'lowpass';
+            filter.frequency.value = 350;
+            
+            gain.gain.value = 0.025;
+            
+            osc.connect(filter);
+            filter.connect(gain);
+            gain.connect(ctx.destination);
+            
+            osc.start();
+            return { osc, gain };
+          });
+        }
+
+        stopAmbientSound() {
+          if (!this.synthNodes) return;
+          this.synthNodes.forEach(node => {
+            try {
+              node.osc.stop();
+              node.osc.disconnect();
+              node.gain.disconnect();
+            } catch(e){}
+          });
+          this.synthNodes = null;
         }
 
         createWallControlAndSwitches() {
@@ -640,14 +699,22 @@
         }
 
         cycleLightIntensity() {
-          this.lightIntensity = this.lightIntensity === 0.75 ? 0.4 : 
-                                this.lightIntensity === 0.4 ? 1.1 : 0.75;
+          this.lightIntensity = this.lightIntensity === 0.375 ? 0.2 : 
+                                this.lightIntensity === 0.2 ? 0.55 : 0.375;
           this.directionalLight.intensity = this.lightIntensity;
         }
 
         onSelectStart(event) {
           const controller = event.target;
           
+          if (this.tvScreenMesh) {
+            const hitTV = xb.core.user.select(this.tvScreenMesh, controller);
+            if (hitTV) {
+              this.toggleAudio();
+              return;
+            }
+          }
+
           const switches = this.children.filter(c => c.userData && c.userData.action);
           for (const sw of switches) {
             const intersection = xb.core.user.select(sw, controller);
