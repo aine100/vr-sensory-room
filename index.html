@@ -44,7 +44,6 @@
     </style>
   </head>
   <body>
-    <!-- Embedded Spotify Web Player Iframe for custom music selection -->
     <div id="spotify-container">
       <iframe src="https://open.spotify.com/embed/playlist/37i9dQZF1DX8Uebhn9wzrS?utm_source=generator&theme=0" width="100%" height="152" frameborder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
     </div>
@@ -76,10 +75,10 @@
           this.breathingPhase = 0;
 
           this.themes = [
-            { name: 'Ocean Calm', color: 0x1a365d, lightColor: 0x63b3ed, bubbleColor: 0x4299e1 },
-            { name: 'Forest Serenity', color: 0x1c4532, lightColor: 0x68d391, bubbleColor: 0x48bb78 },
-            { name: 'Lavender Dreams', color: 0x322659, lightColor: 0xb794f4, bubbleColor: 0x9f7aea },
-            { name: 'Warm Sunset', color: 0x4a2810, lightColor: 0xf6ad55, bubbleColor: 0xed8936 }
+            { name: 'Ocean Calm', color: 0x142850, lightColor: 0x63b3ed, bubbleColor: 0x4299e1 },
+            { name: 'Forest Serenity', color: 0x123524, lightColor: 0x68d391, bubbleColor: 0x48bb78 },
+            { name: 'Lavender Dreams', color: 0x271e3d, lightColor: 0xb794f4, bubbleColor: 0x9f7aea },
+            { name: 'Warm Sunset', color: 0x3d1f0f, lightColor: 0xf6ad55, bubbleColor: 0xed8936 }
           ];
         }
 
@@ -88,69 +87,196 @@
             xb.core.input.raycaster.sortFunction = raycastSortFunction;
           }
 
-          this.ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+          this.ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
           this.add(this.ambientLight);
 
           this.directionalLight = new THREE.DirectionalLight(0x63b3ed, this.lightIntensity);
-          this.directionalLight.position.set(0, 5, 2);
+          this.directionalLight.position.set(0, 6, 3);
+          this.directionalLight.castShadow = true;
           this.add(this.directionalLight);
 
-          // Build Enclosed 3D Room Environment
           this.createRoomEnvironment();
-
           this.createSensoryBubbles();
           this.createControlPanel();
+          this.createWallSpotifyPlayer();
+          this.createWallLightSwitches();
         }
 
         createRoomEnvironment() {
-          // Room Walls & Ceiling (Inverted Sphere)
-          const roomGeometry = new THREE.SphereGeometry(8, 32, 32);
+          const roomGeometry = new THREE.SphereGeometry(9, 32, 32);
           const roomMaterial = new THREE.MeshStandardMaterial({
-            color: 0x1a365d,
+            color: 0x142850,
             side: THREE.BackSide,
-            roughness: 0.9,
-            metalness: 0.1
+            roughness: 0.95,
+            metalness: 0.05
           });
           this.roomMesh = new THREE.Mesh(roomGeometry, roomMaterial);
           this.add(this.roomMesh);
 
-          // Room Floor
-          const floorGeometry = new THREE.PlaneGeometry(16, 16);
+          const floorGeometry = new THREE.PlaneGeometry(18, 18);
           const floorMaterial = new THREE.MeshStandardMaterial({
-            color: 0x0f172a,
-            roughness: 0.8
+            color: 0x0b132b,
+            roughness: 0.85,
+            metalness: 0.1
           });
           const floor = new THREE.Mesh(floorGeometry, floorMaterial);
           floor.rotation.x = -Math.PI / 2;
           floor.position.y = 0;
           this.add(floor);
 
-          // Cozy Sensory Seating Cushions
-          const cushionGeo = new THREE.BoxGeometry(0.8, 0.3, 0.8);
-          const cushionMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.7 });
+          const cushionGeo = new THREE.BoxGeometry(0.9, 0.35, 0.9);
+          const cushionMat = new THREE.MeshStandardMaterial({ color: 0x27496d, roughness: 0.7 });
           
           const cushion1 = new THREE.Mesh(cushionGeo, cushionMat);
-          cushion1.position.set(-1.2, 0.15, -1.8);
+          cushion1.position.set(-1.4, 0.17, -1.8);
           this.add(cushion1);
 
           const cushion2 = new THREE.Mesh(cushionGeo, cushionMat);
-          cushion2.position.set(1.2, 0.15, -1.8);
+          cushion2.position.set(1.4, 0.17, -1.8);
           this.add(cushion2);
 
           const cushion3 = new THREE.Mesh(cushionGeo, cushionMat);
-          cushion3.position.set(0, 0.15, -2.6);
+          cushion3.position.set(0, 0.17, -2.8);
           this.add(cushion3);
+
+          const posterGeo = new THREE.PlaneGeometry(1.4, 1.9);
+          const canvas = document.createElement('canvas');
+          canvas.width = 512;
+          canvas.height = 700;
+          const ctx = canvas.getContext('2d');
+          
+          ctx.fillStyle = '#0f172a';
+          ctx.fillRect(0, 0, 512, 700);
+          ctx.fillStyle = '#fce7f3';
+          ctx.fillRect(16, 16, 480, 668);
+
+          ctx.fillStyle = '#db2777';
+          ctx.font = 'bold 44px Inter, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('TAYLOR SWIFT', 256, 90);
+          
+          ctx.fillStyle = '#7e22ce';
+          ctx.font = '26px Inter, sans-serif';
+          ctx.fillText('The Eras Tour Sanctuary', 256, 135);
+
+          ctx.fillStyle = '#ec4899';
+          ctx.beginPath();
+          ctx.arc(256, 380, 150, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 64px Inter, sans-serif';
+          ctx.fillText('★', 256, 402);
+
+          const posterTexture = new THREE.CanvasTexture(canvas);
+          const posterMat = new THREE.MeshStandardMaterial({ map: posterTexture, roughness: 0.3 });
+          const posterMesh = new THREE.Mesh(posterGeo, posterMat);
+          posterMesh.position.set(2.8, 2.2, -1.8);
+          posterMesh.rotation.y = -Math.PI / 4;
+          this.add(posterMesh);
+        }
+
+        createWallSpotifyPlayer() {
+          const panelGeo = new THREE.PlaneGeometry(1.8, 1.0);
+          const canvas = document.createElement('canvas');
+          canvas.width = 640;
+          canvas.height = 360;
+          const ctx = canvas.getContext('2d');
+
+          ctx.fillStyle = '#0a0a0a';
+          ctx.fillRect(0, 0, 640, 360);
+          ctx.strokeStyle = '#262626';
+          ctx.lineWidth = 12;
+          ctx.strokeRect(6, 6, 628, 348);
+
+          ctx.fillStyle = '#121212';
+          ctx.fillRect(16, 16, 608, 328);
+
+          ctx.fillStyle = '#1db954';
+          ctx.font = 'bold 32px Inter, sans-serif';
+          ctx.fillText('Spotify TV Player', 40, 65);
+
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '26px Inter, sans-serif';
+          ctx.fillText('Now Playing: Weightless (Ambient)', 40, 130);
+
+          ctx.fillStyle = '#b3b3b3';
+          ctx.font = '20px Inter, sans-serif';
+          ctx.fillText('Marconi Union • Calming Soundscapes', 40, 170);
+
+          ctx.fillStyle = '#404040';
+          ctx.fillRect(40, 230, 528, 12);
+          ctx.fillStyle = '#1db954';
+          ctx.fillRect(40, 230, 210, 12);
+
+          ctx.fillStyle = '#22c55e';
+          ctx.beginPath();
+          ctx.arc(590, 45, 5, 0, Math.PI * 2);
+          ctx.fill();
+
+          const texture = new THREE.CanvasTexture(canvas);
+          const mat = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.1, metalness: 0.2 });
+          const mesh = new THREE.Mesh(panelGeo, mat);
+          mesh.position.set(-2.8, 2.2, -1.8);
+          mesh.rotation.y = Math.PI / 4;
+          this.add(mesh);
+        }
+
+        createWallLightSwitches() {
+          const switchGeo = new THREE.PlaneGeometry(0.7, 0.7);
+          
+          const canvasBubble = document.createElement('canvas');
+          canvasBubble.width = 256;
+          canvasBubble.height = 256;
+          const ctxBubble = canvasBubble.getContext('2d');
+          ctxBubble.fillStyle = '#1e293b';
+          ctxBubble.fillRect(0, 0, 256, 256);
+          ctxBubble.fillStyle = '#38bdf8';
+          ctxBubble.beginPath();
+          ctxBubble.arc(128, 110, 60, 0, Math.PI * 2);
+          ctxBubble.fill();
+          ctxBubble.fillStyle = '#ffffff';
+          ctxBubble.font = 'bold 24px Inter, sans-serif';
+          ctxBubble.textAlign = 'center';
+          ctxBubble.fillText('🫧 BUBBLE', 128, 215);
+
+          const textureBubble = new THREE.CanvasTexture(canvasBubble);
+          const matBubble = new THREE.MeshStandardMaterial({ map: textureBubble, roughness: 0.2 });
+          const meshBubble = new THREE.Mesh(switchGeo, matBubble);
+          meshBubble.position.set(-1.8, 2.2, -2.6);
+          this.add(meshBubble);
+
+          const canvasLight = document.createElement('canvas');
+          canvasLight.width = 256;
+          canvasLight.height = 256;
+          const ctxLight = canvasLight.getContext('2d');
+          ctxLight.fillStyle = '#1e293b';
+          ctxLight.fillRect(0, 0, 256, 256);
+          ctxLight.fillStyle = '#fbbf24';
+          ctxLight.beginPath();
+          ctxLight.arc(128, 110, 60, 0, Math.PI * 2);
+          ctxLight.fill();
+          ctxLight.fillStyle = '#ffffff';
+          ctxLight.font = 'bold 24px Inter, sans-serif';
+          ctxLight.textAlign = 'center';
+          ctxLight.fillText('💡 LIGHTS', 128, 215);
+
+          const textureLight = new THREE.CanvasTexture(canvasLight);
+          const matLight = new THREE.MeshStandardMaterial({ map: textureLight, roughness: 0.2 });
+          const meshLight = new THREE.Mesh(switchGeo, matLight);
+          meshLight.position.set(-1.0, 2.2, -2.6);
+          this.add(meshLight);
         }
 
         createSensoryBubbles() {
-          const particleCount = 180;
+          const particleCount = 200;
           const geometry = new THREE.SphereGeometry(0.06, 16, 16);
           const material = new THREE.MeshStandardMaterial({
             color: 0x4299e1,
             transparent: true,
-            opacity: 0.65,
+            opacity: 0.7,
             roughness: 0.1,
-            metalness: 0.2
+            metalness: 0.3
           });
 
           this.bubbleParticles = new THREE.InstancedMesh(geometry, material, particleCount);
@@ -158,9 +284,9 @@
           this.bubbleData = [];
 
           for (let i = 0; i < particleCount; i++) {
-            const x = (Math.random() - 0.5) * 6;
-            const y = Math.random() * 4;
-            const z = (Math.random() - 0.5) * 6 - 1.5;
+            const x = (Math.random() - 0.5) * 7;
+            const y = Math.random() * 4.5;
+            const z = (Math.random() - 0.5) * 7 - 1.5;
             dummy.position.set(x, y, z);
             dummy.updateMatrix();
             this.bubbleParticles.setMatrixAt(i, dummy.matrix);
@@ -171,7 +297,10 @@
               z: z,
               baseSpeed: 0.002 + Math.random() * 0.003,
               wobbleSpeed: 1 + Math.random() * 3,
-              wobbleAmount: 0.02 + Math.random() * 0.03
+              wobbleAmount: 0.02 + Math.random() * 0.03,
+              vx: 0,
+              vy: 0,
+              vz: 0
             });
           }
 
@@ -182,8 +311,8 @@
         createControlPanel() {
           const card = this.uiCore.createCard({
             name: 'SensoryControlCard',
-            sizeX: 1.5,
-            sizeY: 1.45,
+            sizeX: 2.3,
+            sizeY: 1.9,
             position: new THREE.Vector3(0, 1.4, -1.6),
             behaviors: [
               new ManipulationBehavior({
@@ -199,7 +328,7 @@
             height: '100%',
             fillColor: 'rgba(15, 23, 42, 0.95)',
             cornerRadius: 40,
-            padding: 30,
+            padding: 35,
             flexDirection: 'column',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -207,15 +336,15 @@
           card.add(panel);
 
           const title = new UIText('Sensory Room Sanctuary', {
-            fontSize: 42,
+            fontSize: 52,
             fontWeight: 'bold',
             color: '#e2e8f0',
             textAlign: 'center'
           });
           panel.add(title);
 
-          const subtitle = new UIText('Custom Themes, Bubble Speed & Spotify Music', {
-            fontSize: 22,
+          const subtitle = new UIText('Themes, Bubble Speed & Breathing Guidance', {
+            fontSize: 26,
             color: '#94a3b8',
             textAlign: 'center'
           });
@@ -223,7 +352,7 @@
 
           const themeRow = new UIPanel({
             flexDirection: 'row',
-            gap: 16,
+            gap: 25,
             width: '100%',
             justifyContent: 'center',
             alignItems: 'center',
@@ -231,9 +360,9 @@
 
           const createButton = (label, onClickCb, bg = '#334155') => {
             const button = new UIPanel({
-              width: 210,
-              height: 70,
-              cornerRadius: 22,
+              width: 280,
+              height: 95,
+              cornerRadius: 24,
               fillColor: bg,
               justifyContent: 'center',
               alignItems: 'center',
@@ -243,7 +372,7 @@
             });
 
             const btnText = new UIText(label, {
-              fontSize: 26,
+              fontSize: 34,
               color: '#ffffff',
               textAlign: 'center'
             });
@@ -257,7 +386,7 @@
 
           const themeRow2 = new UIPanel({
             flexDirection: 'row',
-            gap: 16,
+            gap: 25,
             width: '100%',
             justifyContent: 'center',
             alignItems: 'center',
@@ -268,7 +397,7 @@
 
           const customRow = new UIPanel({
             flexDirection: 'row',
-            gap: 16,
+            gap: 25,
             width: '100%',
             justifyContent: 'center',
             alignItems: 'center',
@@ -328,11 +457,40 @@
           if (this.bubbleParticles && this.bubbleData) {
             const time = performance.now() * 0.001;
             const dummy = new THREE.Object3D();
+            
+            const controllerPositions = [];
+            if (xb.core.input && xb.core.input.controllers) {
+              for (const controller of xb.core.input.controllers) {
+                if (controller.position) {
+                  controllerPositions.push(controller.position);
+                }
+              }
+            }
 
             for (let i = 0; i < this.bubbleData.length; i++) {
               const data = this.bubbleData[i];
-              data.y += data.baseSpeed * this.bubbleSpeedMultiplier;
-              if (data.y > 4.5) data.y = -0.5;
+              data.y += (data.baseSpeed + data.vy) * this.bubbleSpeedMultiplier;
+              if (data.y > 4.8) data.y = -0.5;
+
+              data.x += data.vx;
+              data.z += data.vz;
+              data.vx *= 0.92;
+              data.vy *= 0.92;
+              data.vz *= 0.92;
+
+              for (const pos of controllerPositions) {
+                const dx = data.x - pos.x;
+                const dy = data.y - pos.y;
+                const dz = data.z - pos.z;
+                const distSq = dx * dx + dy * dy + dz * dz;
+                if (distSq < 0.35) {
+                  const dist = Math.sqrt(distSq);
+                  const force = (0.5 - dist) * 0.09;
+                  data.vx += (dx / (dist || 0.001)) * force;
+                  data.vy += (dy / (dist || 0.001)) * force;
+                  data.vz += (dz / (dist || 0.001)) * force;
+                }
+              }
 
               const wobbleX = data.x + Math.sin(time * data.wobbleSpeed + i) * data.wobbleAmount;
               const wobbleZ = data.z + Math.cos(time * data.wobbleSpeed + i) * data.wobbleAmount;
