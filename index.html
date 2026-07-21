@@ -28,26 +28,8 @@
         }
       }
     </script>
-    <style>
-      #spotify-container {
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        width: 320px;
-        height: 152px;
-        z-index: 9999;
-        border-radius: 12px;
-        overflow: hidden;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-        background: #121212;
-      }
-    </style>
   </head>
   <body>
-    <div id="spotify-container">
-      <iframe src="https://open.spotify.com/embed/playlist/37i9dQZF1DX8Uebhn9wzrS?utm_source=generator&theme=0" width="100%" height="152" frameborder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
-    </div>
-
     <script type="module">
       import * as uikit from '@pmndrs/uikit';
       import * as THREE from 'three';
@@ -71,6 +53,7 @@
           this.currentThemeIndex = 0;
           this.bubbleSpeedMultiplier = 1.0;
           this.lightIntensity = 2.0;
+          this._taylorPlaying = false;
 
           // Expanded color themes for rich environmental mood selection
           this.themes = [
@@ -163,6 +146,40 @@
           floor.receiveShadow = true;
           this.add(floor);
 
+          // Realistic 3D Standing Floor Lamps
+          const lampPoleGeo = new THREE.CylinderGeometry(0.03, 0.03, 3.2, 16);
+          const lampMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.2 });
+          const shadeGeo = new THREE.ConeGeometry(0.35, 0.6, 32);
+          const shadeMat = new THREE.MeshStandardMaterial({ color: 0xfef08a, emissive: 0xfef08a, emissiveIntensity: 0.6, roughness: 0.1 });
+
+          const lampGroup1 = new THREE.Group();
+          const pole1 = new THREE.Mesh(lampPoleGeo, lampMat);
+          pole1.position.y = 1.6;
+          lampGroup1.add(pole1);
+          const shade1 = new THREE.Mesh(shadeGeo, shadeMat);
+          shade1.position.y = 3.0;
+          lampGroup1.add(shade1);
+          lampGroup1.position.set(-4.2, 0, -4.2);
+          this.add(lampGroup1);
+
+          const lampGroup2 = new THREE.Group();
+          const pole2 = new THREE.Mesh(lampPoleGeo, lampMat);
+          pole2.position.y = 1.6;
+          lampGroup2.add(pole2);
+          const shade2 = new THREE.Mesh(shadeGeo, shadeMat);
+          shade2.position.y = 3.0;
+          lampGroup2.add(shade2);
+          lampGroup2.position.set(4.2, 0, -4.2);
+          this.add(lampGroup2);
+
+          const warmLight1 = new THREE.PointLight(0xfef08a, 1.5, 6);
+          warmLight1.position.set(-4.2, 3.0, -4.2);
+          this.add(warmLight1);
+
+          const warmLight2 = new THREE.PointLight(0xfef08a, 1.5, 6);
+          warmLight2.position.set(4.2, 3.0, -4.2);
+          this.add(warmLight2);
+
           // Scenic Relaxing Window
           const windowGeo = new THREE.PlaneGeometry(2.2, 2.6);
           const wCanvas = document.createElement('canvas');
@@ -225,52 +242,20 @@
           cushion3.castShadow = true;
           this.add(cushion3);
 
-          // Taylor Swift Poster
+          // Taylor Swift Poster using uploaded asset
           const posterGeo = new THREE.PlaneGeometry(1.5, 2.1);
-          const canvas = document.createElement('canvas');
-          canvas.width = 600;
-          canvas.height = 840;
-          const ctx = canvas.getContext('2d');
-          
-          const pGrad = ctx.createLinearGradient(0, 0, 0, 840);
-          pGrad.addColorStop(0, '#fbcfe8');
-          pGrad.addColorStop(0.5, '#fde68a');
-          pGrad.addColorStop(1, '#bae6fd');
-          ctx.fillStyle = pGrad;
-          ctx.fillRect(0, 0, 600, 840);
-
-          ctx.strokeStyle = '#1e293b';
-          ctx.lineWidth = 16;
-          ctx.strokeRect(0, 0, 600, 840);
-
-          ctx.fillStyle = '#831843';
-          ctx.beginPath();
-          ctx.arc(300, 360, 180, 0, Math.PI * 2);
-          ctx.fill();
-
-          ctx.fillStyle = '#fce7f3';
-          ctx.font = 'bold 80px Inter, sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('TS', 300, 390);
-
-          ctx.fillStyle = '#1e293b';
-          ctx.font = 'bold 46px Inter, sans-serif';
-          ctx.fillText('TAYLOR SWIFT', 300, 640);
-
-          ctx.fillStyle = '#64748b';
-          ctx.font = '24px Inter, sans-serif';
-          ctx.fillText('THE ERAS TOUR • LIVE IN CONCERT', 300, 690);
-
-          ctx.fillStyle = '#d97706';
-          ctx.font = '32px Inter, sans-serif';
-          ctx.fillText('★   ★   ★   ★   ★', 300, 760);
-
-          const posterTexture = new THREE.CanvasTexture(canvas);
-          const posterMat = new THREE.MeshStandardMaterial({ map: posterTexture, roughness: 0.2 });
+          const posterMat = new THREE.MeshStandardMaterial({ roughness: 0.2 });
           const posterMesh = new THREE.Mesh(posterGeo, posterMat);
           posterMesh.position.set(-roomWidth / 2 + 0.02, 2.2, -1.0);
           posterMesh.rotation.y = Math.PI / 2;
+          this.taylorPosterMesh = posterMesh;
           this.add(posterMesh);
+
+          const textureLoader = new THREE.TextureLoader();
+          textureLoader.load('taylor1.avif', (tex) => {
+            posterMat.map = tex;
+            posterMat.needsUpdate = true;
+          });
         }
 
         createWallSpotifyPlayer() {
@@ -287,45 +272,13 @@
           canvas.width = 640;
           canvas.height = 360;
           const ctx = canvas.getContext('2d');
+          this.tvCanvas = canvas;
+          this.tvCtx = ctx;
 
-          ctx.fillStyle = '#121212';
-          ctx.fillRect(0, 0, 640, 360);
-
-          ctx.fillStyle = '#1db954';
-          ctx.font = 'bold 28px Inter, sans-serif';
-          ctx.fillText('Spotify Connected TV', 40, 55);
-
-          ctx.fillStyle = '#282828';
-          ctx.fillRect(40, 85, 110, 110);
-          ctx.fillStyle = '#1db954';
-          ctx.font = 'bold 42px Inter, sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('♫', 95, 155);
-          ctx.textAlign = 'left';
-
-          ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 24px Inter, sans-serif';
-          ctx.fillText('Weightless (Calming Ambient)', 170, 115);
-
-          ctx.fillStyle = '#b3b3b3';
-          ctx.font = '18px Inter, sans-serif';
-          ctx.fillText('Marconi Union • Autism Sensory Relax', 170, 150);
-
-          ctx.fillStyle = '#535353';
-          ctx.fillRect(40, 230, 560, 8);
-          ctx.fillStyle = '#1db954';
-          ctx.fillRect(40, 230, 240, 8);
-
-          ctx.fillStyle = '#a7a7a7';
-          ctx.font = '14px Inter, sans-serif';
-          ctx.fillText('2:15', 40, 260);
-          ctx.fillText('5:00', 570, 260);
-
-          ctx.fillStyle = '#ffffff';
-          ctx.font = '22px Inter, sans-serif';
-          ctx.fillText('⏮    ▶    ⏭    🔊', 250, 315);
+          this.updateTvDisplay('Weightless (Calming Ambient)', 'Marconi Union', false);
 
           const texture = new THREE.CanvasTexture(canvas);
+          this.tvTexture = texture;
           const screenMat = new THREE.MeshBasicMaterial({ map: texture });
           const screenMesh = new THREE.Mesh(screenGeo, screenMat);
           screenMesh.position.z = 0.042;
@@ -334,6 +287,50 @@
           tvGroup.position.set(-1.5, 2.2, -4.95);
           tvGroup.rotation.y = 0;
           this.add(tvGroup);
+        }
+
+        updateTvDisplay(trackTitle, artist, isTaylorPlaylist) {
+          const ctx = this.tvCtx;
+          ctx.fillStyle = '#121212';
+          ctx.fillRect(0, 0, 640, 360);
+
+          ctx.fillStyle = '#1db954';
+          ctx.font = 'bold 28px Inter, sans-serif';
+          ctx.fillText(isTaylorPlaylist ? 'Spotify • Taylor Swift Playlist' : 'Spotify Connected TV', 40, 55);
+
+          ctx.fillStyle = isTaylorPlaylist ? '#f43f5e' : '#282828';
+          ctx.fillRect(40, 85, 110, 110);
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 36px Inter, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(isTaylorPlaylist ? '★' : '♫', 95, 150);
+          ctx.textAlign = 'left';
+
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 24px Inter, sans-serif';
+          ctx.fillText(trackTitle, 170, 115);
+
+          ctx.fillStyle = '#b3b3b3';
+          ctx.font = '18px Inter, sans-serif';
+          ctx.fillText(artist, 170, 150);
+
+          ctx.fillStyle = '#535353';
+          ctx.fillRect(40, 230, 560, 8);
+          ctx.fillStyle = '#1db954';
+          ctx.fillRect(40, 230, isTaylorPlaylist ? 420 : 240, 8);
+
+          ctx.fillStyle = '#a7a7a7';
+          ctx.font = '14px Inter, sans-serif';
+          ctx.fillText('3:45', 40, 260);
+          ctx.fillText('4:15', 570, 260);
+
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '22px Inter, sans-serif';
+          ctx.fillText('⏮    ▶ (Playing)    ⏭    🔊', 200, 315);
+
+          if (this.tvTexture) {
+            this.tvTexture.needsUpdate = true;
+          }
         }
 
         createWallControlAndSwitches() {
@@ -358,7 +355,7 @@
           const textureBubble = new THREE.CanvasTexture(canvasBubble);
           const matBubble = new THREE.MeshStandardMaterial({ map: textureBubble, roughness: 0.2 });
           const meshBubble = new THREE.Mesh(switchGeo, matBubble);
-          meshBubble.position.set(0.6, 2.2, -4.95);
+          meshBubble.position.set(-0.6, 2.2, -4.95);
           meshBubble.userData = { action: 'speed' };
           this.add(meshBubble);
 
@@ -381,7 +378,7 @@
           const textureLight = new THREE.CanvasTexture(canvasLight);
           const matLight = new THREE.MeshStandardMaterial({ map: textureLight, roughness: 0.2 });
           const meshLight = new THREE.Mesh(switchGeo, matLight);
-          meshLight.position.set(1.4, 2.2, -4.95);
+          meshLight.position.set(0.2, 2.2, -4.95);
           meshLight.userData = { action: 'light' };
           this.add(meshLight);
 
@@ -404,9 +401,42 @@
           const textureTheme = new THREE.CanvasTexture(canvasTheme);
           const matTheme = new THREE.MeshStandardMaterial({ map: textureTheme, roughness: 0.2 });
           const meshTheme = new THREE.Mesh(switchGeo, matTheme);
-          meshTheme.position.set(2.2, 2.2, -4.95);
+          meshTheme.position.set(1.0, 2.2, -4.95);
           meshTheme.userData = { action: 'theme' };
           this.add(meshTheme);
+
+          // Cute Individual Theme Buttons Panel
+          const themePanelGeo = new THREE.PlaneGeometry(2.4, 0.6);
+          const tCanvas = document.createElement('canvas');
+          tCanvas.width = 768;
+          tCanvas.height = 192;
+          const tCtx = tCanvas.getContext('2d');
+          
+          tCtx.fillStyle = '#0f172a';
+          tCtx.fillRect(0, 0, 768, 192);
+
+          const themeNames = ['Ocean', 'Forest', 'Lavender', 'Sunset', 'Aurora', 'Neon'];
+          const colors = ['#63b3ed', '#68d391', '#b794f4', '#f6ad55', '#34d399', '#f43f5e'];
+          
+          for(let i=0; i<6; i++) {
+            const x = 12 + i * 124;
+            tCtx.fillStyle = colors[i];
+            tCtx.beginPath();
+            tCtx.roundRect(x, 24, 112, 144, 24);
+            tCtx.fill();
+
+            tCtx.fillStyle = '#ffffff';
+            tCtx.font = 'bold 22px Inter, sans-serif';
+            tCtx.textAlign = 'center';
+            tCtx.fillText(themeNames[i], x + 56, 110);
+          }
+
+          const tTexture = new THREE.CanvasTexture(tCanvas);
+          const tMat = new THREE.MeshStandardMaterial({ map: tTexture, roughness: 0.3 });
+          const tMesh = new THREE.Mesh(themePanelGeo, tMat);
+          tMesh.position.set(0.6, 1.35, -4.95);
+          tMesh.userData = { action: 'theme_panel' };
+          this.add(tMesh);
         }
 
         setTheme(index) {
@@ -447,7 +477,6 @@
 
         onSelectStart(event) {
           const controller = event.target;
-          // Check interaction with wall switches
           const switches = this.children.filter(c => c.userData && c.userData.action);
           for (const sw of switches) {
             const intersection = xb.core.user.select(sw, controller);
@@ -455,6 +484,13 @@
               if (sw.userData.action === 'speed') this.cycleBubbleSpeed();
               if (sw.userData.action === 'light') this.cycleLightIntensity();
               if (sw.userData.action === 'theme') this.cycleTheme();
+              if (sw.userData.action === 'theme_panel') {
+                const uv = intersection.uv;
+                if (uv) {
+                  const idx = Math.min(5, Math.floor(uv.x * 6));
+                  this.setTheme(idx);
+                }
+              }
             }
           }
         }
@@ -510,6 +546,20 @@
                 if (controller.position) {
                   controllerPositions.push(controller.position);
                 }
+              }
+            }
+
+            // Proximity trigger for Taylor Swift poster playlist (-4.8, 2.2, -1.0)
+            if (xb.core.camera) {
+              const camPos = xb.core.camera.position;
+              const posterPos = new THREE.Vector3(-4.8, 2.2, -1.0);
+              const dist = camPos.distanceTo(posterPos);
+              if (dist < 2.0 && !this._taylorPlaying) {
+                this._taylorPlaying = true;
+                this.updateTvDisplay('Anti-Hero (The Eras Tour Live)', 'Taylor Swift • Pop Anthems', true);
+              } else if (dist >= 2.0 && this._taylorPlaying) {
+                this._taylorPlaying = false;
+                this.updateTvDisplay('Weightless (Calming Ambient)', 'Marconi Union • Autism Sensory Relax', false);
               }
             }
 
