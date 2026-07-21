@@ -85,6 +85,12 @@
               artist: "Taylor Swift", 
               cover: "https://placehold.co/64748b/f8fafc?text=Folklore",
               tracks: ["cardigan", "exile", "august", "the last great american dynasty"]
+            },
+            { 
+              name: "Lover", 
+              artist: "Taylor Swift", 
+              cover: "https://placehold.co/f472b6/ffffff?text=Lover",
+              tracks: ["ME!", "You Need To Calm Down", "Lover", "Archer"]
             }
           ];
 
@@ -126,7 +132,6 @@
           this.createWallSpotifyPlayer();
           this.createWallControlAndSwitches();
           this.createOvalTableAndLavaLamp();
-          this.createSpawnPoints();
 
           this.setTheme(0);
         }
@@ -496,24 +501,6 @@
 
           this.lavaGroup.position.set(0.0, 0.48, 0);
           tableGroup.add(this.lavaGroup);
-        }
-
-        createSpawnPoints() {
-          const padGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.02, 32);
-          
-          const mat1 = new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7, roughness: 0.3 });
-          const pad1 = new THREE.Mesh(padGeo, mat1);
-          pad1.position.set(0, 0.02, -2.5);
-          pad1.userData = { targetPos: new THREE.Vector3(0, 1.6, -1.5), name: "Spotify TV View" };
-          this.add(pad1);
-          this.movableObjects.push(pad1);
-
-          const mat2 = new THREE.MeshStandardMaterial({ color: 0x34d399, emissive: 0x059669, roughness: 0.3 });
-          const pad2 = new THREE.Mesh(padGeo, mat2);
-          pad2.position.set(0, 0.02, 1.0);
-          pad2.userData = { targetPos: new THREE.Vector3(0, 1.6, 2.0), name: "Center Room" };
-          this.add(pad2);
-          this.movableObjects.push(pad2);
         }
 
         setTheme(index) {
