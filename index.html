@@ -46,11 +46,9 @@
           // State Variables
           this.currentThemeIndex = 0;
           this.bubbleSpeedMultiplier = 1.0;
-          this.lightIntensity = 1.5; // Reduced light influence by half
+          this.lightIntensity = 0.375; // Reduced light influence by half from original 0.75
           this.bubblesActive = true;
           this.lampsActive = true;
-
-          this.tempLabels = []; // Track temporary labels
 
           // Object Collections for Interactivity and Collision
           this.movableObjects = [];
@@ -63,9 +61,9 @@
           this.roomHeight = 4;
           this.roomDepth = 10;
 
-          // Locomotion state
+          // Locomotion and turning state
           this.moveVelocity = new THREE.Vector3();
-          this.keys = { w: false, a: false, s: false, d: false };
+          this.keys = { w: false, a: false, s: false, d: false, q: false, e: false, arrowLeft: false, arrowRight: false };
 
           // Expanded color themes for rich environmental mood selection
           this.themes = [
@@ -81,22 +79,6 @@
           this.handleKeyUp = this.handleKeyUp.bind(this);
         }
 
-        addLabel(text, parent, offsetY = 1.0) {
-          const label = new Text();
-          label.text = text;
-          label.fontSize = 0.15;
-          label.color = 0xffffff;
-          label.outlineWidth = 0.02;
-          label.outlineColor = 0x000000;
-          label.anchorX = 'center';
-          label.anchorY = 'bottom';
-          label.position.y = offsetY;
-          label.sync();
-          parent.add(label);
-          this.tempLabels.push(label);
-          return label;
-        }
-
         async init() {
           if (xb.core.input.raycaster) {
             xb.core.input.raycaster.sortFunction = raycastSortFunction;
@@ -105,7 +87,7 @@
           window.addEventListener('keydown', this.handleKeyDown);
           window.addEventListener('keyup', this.handleKeyUp);
 
-          this.ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+          this.ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
           this.add(this.ambientLight);
 
           this.directionalLight = new THREE.DirectionalLight(0x63b3ed, this.lightIntensity);
@@ -129,6 +111,10 @@
           if (e.key === 'a' || e.key === 'A') this.keys.a = true;
           if (e.key === 's' || e.key === 'S') this.keys.s = true;
           if (e.key === 'd' || e.key === 'D') this.keys.d = true;
+          if (e.key === 'q' || e.key === 'Q') this.keys.q = true;
+          if (e.key === 'e' || e.key === 'E') this.keys.e = true;
+          if (e.key === 'ArrowLeft') this.keys.arrowLeft = true;
+          if (e.key === 'ArrowRight') this.keys.arrowRight = true;
         }
 
         handleKeyUp(e) {
@@ -136,11 +122,15 @@
           if (e.key === 'a' || e.key === 'A') this.keys.a = false;
           if (e.key === 's' || e.key === 'S') this.keys.s = false;
           if (e.key === 'd' || e.key === 'D') this.keys.d = false;
+          if (e.key === 'q' || e.key === 'Q') this.keys.q = false;
+          if (e.key === 'e' || e.key === 'E') this.keys.e = false;
+          if (e.key === 'ArrowLeft') this.keys.arrowLeft = false;
+          if (e.key === 'ArrowRight') this.keys.arrowRight = false;
         }
 
         createRoomEnvironment() {
           const wallMaterial = new THREE.MeshStandardMaterial({
-            color: 0xf8fafc, // Bright soothing white walls
+            color: 0xf8fafc,
             roughness: 0.9,
             metalness: 0.05,
             side: THREE.BackSide
@@ -160,17 +150,15 @@
           });
           const floor = new THREE.Mesh(floorGeometry, floorMaterial);
           floor.rotation.x = -Math.PI / 2;
-          floor.position.y = 0.01; // Avoid z-fighting flicker in VR
+          floor.position.y = 0.01;
           floor.receiveShadow = true;
           this.add(floor);
 
-          // Cylindrical Standing Floor Lamps
           const lampPoleGeo = new THREE.CylinderGeometry(0.03, 0.03, 3.2, 16);
           const lampMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.2 });
           const shadeGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.8, 32, 1, true);
           const shadeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.DoubleSide, roughness: 0.4 });
 
-          // Lamp 1 (Back Left)
           const lampGroup1 = new THREE.Group();
           const pole1 = new THREE.Mesh(lampPoleGeo, lampMat);
           pole1.position.y = 1.6;
@@ -181,9 +169,7 @@
           lampGroup1.position.set(-4.0, 0, 4.0);
           this.add(lampGroup1);
           this.movableObjects.push(lampGroup1);
-          this.addLabel('Left Lamp', lampGroup1, 3.8);
 
-          // Lamp 2 (Back Right)
           const lampGroup2 = new THREE.Group();
           const pole2 = new THREE.Mesh(lampPoleGeo, lampMat);
           pole2.position.y = 1.6;
@@ -194,15 +180,13 @@
           lampGroup2.position.set(4.0, 0, 4.0);
           this.add(lampGroup2);
           this.movableObjects.push(lampGroup2);
-          this.addLabel('Right Lamp', lampGroup2, 3.8);
 
-          // Point lights for lamps (moderated intensity)
-          this.warmLight1 = new THREE.PointLight(0xfef08a, 1.2, 8);
+          this.warmLight1 = new THREE.PointLight(0xfef08a, 0.3, 8);
           this.warmLight1.position.set(-4.0, 2.8, 4.0);
           this.warmLight1.castShadow = true;
           this.add(this.warmLight1);
 
-          this.warmLight2 = new THREE.PointLight(0xfef08a, 1.2, 8);
+          this.warmLight2 = new THREE.PointLight(0xfef08a, 0.3, 8);
           this.warmLight2.position.set(4.0, 2.8, 4.0);
           this.warmLight2.castShadow = true;
           this.add(this.warmLight2);
@@ -238,12 +222,12 @@
           rightArm.castShadow = true;
           this.couchGroup.add(rightArm);
 
-          this.couchGroup.position.set(0, 0.01, 3.5);
-          this.couchGroup.rotation.y = Math.PI; // Face front
+          // Positioned safely against the back wall, facing forward
+          this.couchGroup.position.set(0, 0.01, 3.8);
+          this.couchGroup.rotation.y = Math.PI;
           
           this.add(this.couchGroup);
           this.movableObjects.push(this.couchGroup);
-          this.couchLabel = this.addLabel('Sofa / Couch', this.couchGroup, 1.2);
 
           try {
             const sofa = new xb.ModelViewer({});
@@ -261,8 +245,8 @@
             const box = new THREE.Box3().setFromObject(sofa);
             const size = box.getSize(new THREE.Vector3());
             
-            // Increased couch size slightly as requested (~1.9 meters wide)
-            const targetWidth = 1.9;
+            // Increased sofa size slightly per request (~1.7 meters wide)
+            const targetWidth = 1.7;
             if (size.x > 0) {
               const scaleFactor = targetWidth / size.x;
               sofa.scale.setScalar(scaleFactor);
@@ -278,7 +262,7 @@
             
             const finalCouchGroup = new THREE.Group();
             finalCouchGroup.add(sofa);
-            finalCouchGroup.position.set(0, 0.01, 3.5);
+            finalCouchGroup.position.set(0, 0.01, 3.8);
             finalCouchGroup.rotation.y = Math.PI;
 
             this.remove(this.couchGroup);
@@ -287,7 +271,6 @@
             this.couchGroup = finalCouchGroup;
             this.add(this.couchGroup);
             this.movableObjects.push(this.couchGroup);
-            this.couchGroup.add(this.couchLabel);
           } catch (e) {
             console.warn('Using built-in cozy sofa model.');
           }
@@ -296,7 +279,6 @@
         createOvalTableAndLavaLamp() {
           this.tableGroup = new THREE.Group();
           
-          // Oval Coffee Table
           const tableTopGeo = new THREE.CylinderGeometry(0.6, 0.6, 0.05, 32);
           tableTopGeo.scale(1.8, 1.0, 1.0);
           const tableMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.6, metalness: 0.2 });
@@ -319,13 +301,11 @@
             this.tableGroup.add(leg);
           });
 
-          // Placed directly in front of the couch in the center
-          this.tableGroup.position.set(0, 0.01, 1.5);
+          // Placed centrally in front of the couch
+          this.tableGroup.position.set(0, 0.01, 2.2);
           this.add(this.tableGroup);
           this.movableObjects.push(this.tableGroup);
-          this.addLabel('Oval Coffee Table', this.tableGroup, 0.6);
 
-          // Lava Lamp
           this.lavaGroup = new THREE.Group();
           const baseGeo = new THREE.CylinderGeometry(0.06, 0.08, 0.15, 16);
           const baseMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9, roughness: 0.2 });
@@ -360,14 +340,13 @@
             this.lavaBlobs.push(blob);
           }
 
-          this.lavaLight = new THREE.PointLight(0x4299e1, 1.0, 3);
+          this.lavaLight = new THREE.PointLight(0x4299e1, 0.25, 3);
           this.lavaLight.position.y = 0.3;
           this.lavaGroup.add(this.lavaLight);
           this.lampLightList.push(this.lavaLight);
 
           this.lavaGroup.position.set(0.6, 0.475, 0); 
           this.tableGroup.add(this.lavaGroup);
-          this.addLabel('Lava Lamp', this.lavaGroup, 0.7);
         }
 
         createWallSpotifyPlayer() {
@@ -396,10 +375,9 @@
           screenMesh.position.z = 0.042;
           tvGroup.add(screenMesh);
 
-          // Centered on the front wall
+          // Perfectly centered on the front wall
           tvGroup.position.set(0, 2.2, -4.95);
           this.add(tvGroup);
-          this.addLabel('Spotify TV', tvGroup, 0.8);
         }
 
         updateTvDisplay(trackTitle, artist, isTaylorPlaylist) {
@@ -485,7 +463,6 @@
             this.add(mesh);
           });
 
-          // Transparent Theme Panel below switches
           const themePanelGeo = new THREE.PlaneGeometry(3.6, 0.8);
           const tCanvas = document.createElement('canvas');
           tCanvas.width = 1536;
@@ -518,7 +495,6 @@
           tMesh.rotation.y = Math.PI / 2;
           tMesh.userData = { action: 'theme_panel' };
           this.add(tMesh);
-          this.addLabel('Theme Controls', tMesh, 0.5);
         }
 
         createTaylorPoster() {
@@ -530,7 +506,6 @@
           posterMesh.rotation.y = -Math.PI / 2;
           this.taylorPosterMesh = posterMesh;
           this.add(posterMesh);
-          this.addLabel('Taylor Poster', posterMesh, 1.2);
 
           const textureLoader = new THREE.TextureLoader();
           textureLoader.load(
@@ -571,7 +546,6 @@
           this.bubbleData = [];
           this.bubbleColors = new Float32Array(particleCount * 3);
 
-          // Rejection sampling for anti-clumping
           const positions = [];
           for (let i = 0; i < particleCount; i++) {
             let x, y, z, valid;
@@ -608,11 +582,6 @@
           this.bubbleParticles.instanceColor = new THREE.InstancedBufferAttribute(this.bubbleColors, 3);
           this.bubbleParticles.instanceMatrix.needsUpdate = true;
           this.add(this.bubbleParticles);
-
-          const bubbleCenter = new THREE.Group();
-          bubbleCenter.position.set(0, 3.5, 0);
-          this.add(bubbleCenter);
-          this.addLabel('Sensory Bubbles', bubbleCenter, 0);
         }
 
         toggleBubbles() {
@@ -671,8 +640,8 @@
         }
 
         cycleLightIntensity() {
-          this.lightIntensity = this.lightIntensity === 1.5 ? 0.8 : 
-                                this.lightIntensity === 0.8 ? 2.2 : 1.5;
+          this.lightIntensity = this.lightIntensity === 0.75 ? 0.4 : 
+                                this.lightIntensity === 0.4 ? 1.1 : 0.75;
           this.directionalLight.intensity = this.lightIntensity;
         }
 
@@ -745,13 +714,6 @@
           const time = performance.now() * 0.001;
           const dt = xb.getDeltaTime() || 0.016;
 
-          if (xb.core.camera && this.tempLabels) {
-            const camPos = xb.core.camera.position;
-            for (const label of this.tempLabels) {
-              label.lookAt(camPos);
-            }
-          }
-
           this.moveVelocity.set(0,0,0);
           const speed = 2.0 * dt;
 
@@ -760,14 +722,38 @@
           if (this.keys.a) this.moveVelocity.x -= speed;
           if (this.keys.d) this.moveVelocity.x += speed;
 
+          let turnInput = 0;
+          if (this.keys.q || this.keys.arrowLeft) turnInput -= 1;
+          if (this.keys.e || this.keys.arrowRight) turnInput += 1;
+
           const session = xb.core.renderer.xr.getSession();
           if (session) {
              for (const source of session.inputSources) {
                  if (source.gamepad && source.gamepad.axes.length >= 4) {
-                     if (Math.abs(source.gamepad.axes[2]) > 0.1) this.moveVelocity.x += source.gamepad.axes[2] * speed;
-                     if (Math.abs(source.gamepad.axes[3]) > 0.1) this.moveVelocity.z += source.gamepad.axes[3] * speed;
+                     if (Math.abs(source.gamepad.axes[2]) > 0.15 && source.handedness === 'right') {
+                         turnInput += source.gamepad.axes[2];
+                     } else if (Math.abs(source.gamepad.axes[2]) > 0.1 && !source.handedness) {
+                         turnInput += source.gamepad.axes[2];
+                     }
+
+                     if (Math.abs(source.gamepad.axes[2]) > 0.1 && source.handedness === 'left') {
+                         this.moveVelocity.x += source.gamepad.axes[2] * speed;
+                     }
+                     if (Math.abs(source.gamepad.axes[3]) > 0.1 && source.handedness === 'left') {
+                         this.moveVelocity.z += source.gamepad.axes[3] * speed;
+                     }
                  }
              }
+          }
+
+          if (turnInput !== 0) {
+             const turnSpeed = 1.5 * dt;
+             const angle = -turnInput * turnSpeed;
+             const camPos = xb.core.camera.position;
+             this.position.sub(camPos);
+             this.rotation.y += angle;
+             this.position.applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+             this.position.add(camPos);
           }
 
           if (this.moveVelocity.lengthSq() > 0) {
