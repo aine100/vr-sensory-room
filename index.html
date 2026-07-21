@@ -59,40 +59,10 @@
           this.roomHeight = 4;
           this.roomDepth = 10;
 
-          this.moveVelocity = new THREE.Vector3();
           this.keys = { w: false, a: false, s: false, d: false, q: false, e: false, arrowLeft: false, arrowRight: false };
 
           this.audioCtx = null;
           this.isPlayingAudio = false;
-          this.spotifyLoggedIn = false;
-          this.currentAlbumIndex = 0;
-          
-          this.albums = [
-            { 
-              name: "Midnights (The Til Dawn Edition)", 
-              artist: "Taylor Swift", 
-              cover: "https://placehold.co/300x300/1e1b4b/e2e8f0?text=Midnights+(Til+Dawn)",
-              tracks: ["Lavender Haze", "Anti-Hero", "Midnight Rain", "You're On Your Own, Kid", "Karma", "Snow On The Beach"]
-            },
-            { 
-              name: "1989 (Taylor's Version)", 
-              artist: "Taylor Swift", 
-              cover: "https://placehold.co/38bdf8/0f172a?text=1989+(TV)",
-              tracks: ["Style (TV)", "Blank Space (TV)", "Shake It Off (TV)", "Bad Blood (TV)"]
-            },
-            { 
-              name: "Folklore", 
-              artist: "Taylor Swift", 
-              cover: "https://placehold.co/64748b/f8fafc?text=Folklore",
-              tracks: ["cardigan", "exile", "august", "the last great american dynasty"]
-            },
-            { 
-              name: "Lover", 
-              artist: "Taylor Swift", 
-              cover: "https://placehold.co/f472b6/ffffff?text=Lover",
-              tracks: ["ME!", "You Need To Calm Down", "Lover", "Archer"]
-            }
-          ];
 
           this.themes = [
             { name: 'Ocean Calm', color: 0x142850, lightColor: 0x63b3ed, bubbleColor: 0x4299e1 },
@@ -301,8 +271,8 @@
 
         createWallSpotifyPlayer() {
           this.spotifyPanel = new xb.SpatialPanel({
-            width: 2.2,
-            height: 1.4,
+            width: 1.8,
+            height: 1.2,
             backgroundColor: '#0f172afc'
           });
           this.spotifyPanel.position.set(0.0, 2.0, -4.9);
@@ -310,89 +280,35 @@
 
           const grid = this.spotifyPanel.addGrid();
           
-          const headerRow = grid.addRow({ weight: 0.15 });
-          headerRow.addText({ text: "🎵 Spotify Premium Hub - Midnights (Til Dawn)", fontColor: '#38bdf8', fontSize: 0.06 });
+          const headerRow = grid.addRow({ weight: 0.2 });
+          headerRow.addText({ text: "🎵 Spotify - Midnights (Til Dawn Edition)", fontColor: '#38bdf8', fontSize: 0.06 });
 
-          const mainContentRow = grid.addRow({ weight: 0.65 });
-          
-          const leftCol = mainContentRow.addCol({ weight: 0.5 });
-          const infoGrid = leftCol.addGrid();
-          
-          this.albumArtImage = infoGrid.addRow({ weight: 0.75 }).addImage({
-            src: this.albums[this.currentAlbumIndex].cover,
-            paddingX: 0.05,
-            paddingY: 0.05
-          });
-          
-          this.trackLabel = infoGrid.addRow({ weight: 0.25 }).addText({
-            text: `${this.albums[this.currentAlbumIndex].name} - ${this.albums[this.currentAlbumIndex].tracks[0]}`,
+          const trackRow = grid.addRow({ weight: 0.3 });
+          this.trackLabel = trackRow.addText({
+            text: "Now Playing: Anti-Hero (Taylor Swift)",
             fontColor: '#ffffff',
+            fontSize: 0.05
+          });
+
+          const statusRow = grid.addRow({ weight: 0.2 });
+          this.statusDisplay = statusRow.addText({
+            text: "⏸ (Click TV to Play Audio)",
+            fontColor: '#94a3b8',
             fontSize: 0.045
           });
 
-          const rightCol = mainContentRow.addCol({ weight: 0.5 });
-          const controlGrid = rightCol.addGrid();
-
-          this.loginButton = controlGrid.addRow({ weight: 0.3 }).addTextButton({
-            text: "🔑 Connect Spotify Premium",
-            backgroundColor: '#1db954',
-            fontColor: '#ffffff',
-            fontSize: 0.16
-          });
-          this.loginButton.onTriggered = () => {
-            this.spotifyLoggedIn = !this.spotifyLoggedIn;
-            this.loginButton.setText(this.spotifyLoggedIn ? "✅ Connected (Premium)" : "🔑 Connect Spotify Premium");
-            this.statusText.setText(this.spotifyLoggedIn ? "Spotify Premium Account Linked!" : "Logged Out");
-          };
-
-          const albumBrowseRow = controlGrid.addRow({ weight: 0.3 });
-          const prevAlbumBtn = albumBrowseRow.addCol({ weight: 0.5 }).addTextButton({
-            text: "◀ Prev Album",
-            backgroundColor: '#334155',
-            fontColor: '#ffffff',
-            fontSize: 0.15
-          });
-          prevAlbumBtn.onTriggered = () => {
-            this.currentAlbumIndex = (this.currentAlbumIndex - 1 + this.albums.length) % this.albums.length;
-            this.updateAlbumDisplay();
-          };
-
-          const nextAlbumBtn = albumBrowseRow.addCol({ weight: 0.5 }).addTextButton({
-            text: "Next Album ▶",
-            backgroundColor: '#334155',
-            fontColor: '#ffffff',
-            fontSize: 0.15
-          });
-          nextAlbumBtn.onTriggered = () => {
-            this.currentAlbumIndex = (this.currentAlbumIndex + 1) % this.albums.length;
-            this.updateAlbumDisplay();
-          };
-
-          this.statusText = controlGrid.addRow({ weight: 0.4 }).addText({
-            text: "Select album & click TV to play",
-            fontColor: '#94a3b8',
-            fontSize: 0.04
-          });
-
-          const footerRow = grid.addRow({ weight: 0.2 });
+          const footerRow = grid.addRow({ weight: 0.3 });
           const playBtn = footerRow.addCol({ weight: 1.0 }).addTextButton({
-            text: "▶ Play / Pause Ambient Soundscape (Click TV Too)",
+            text: "▶ Play / Pause Ambient Soundscape",
             backgroundColor: '#0284c7',
             fontColor: '#ffffff',
-            fontSize: 0.14
+            fontSize: 0.15
           });
           playBtn.onTriggered = () => {
             this.toggleAudio();
           };
 
           this.spotifyPanel.updateLayouts();
-        }
-
-        updateAlbumDisplay() {
-          const album = this.albums[this.currentAlbumIndex];
-          this.albumArtImage.load(album.cover);
-          this.trackLabel.setText(`${album.name} - ${album.tracks[0]}`);
-          this.statusText.setText(`Loaded: ${album.artist}`);
         }
 
         createWallControlAndSwitches() {
@@ -539,6 +455,7 @@
               this.gainNode.disconnect();
             }
             this.isPlayingAudio = false;
+            this.statusDisplay.setText("⏸ (Click TV to Play Audio)");
           } else {
             this.oscillator = this.audioCtx.createOscillator();
             this.gainNode = this.audioCtx.createGain();
@@ -553,6 +470,7 @@
 
             this.oscillator.start();
             this.isPlayingAudio = true;
+            this.statusDisplay.setText("▶ Playing Ambient Soundscape");
           }
         }
 
