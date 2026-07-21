@@ -37,6 +37,9 @@
       import { raycastSortFunction } from 'uiblocks';
       import * as xb from 'xrblocks';
 
+      /**
+       * SensoryRoomScript manages the immersive VR sensory environment, lighting, themes, audio, bubbles, and navigation.
+       */
       class SensoryRoomScript extends xb.Script {
         constructor() {
           super();
@@ -427,8 +430,10 @@
           if (this.directionalLight) {
             this.directionalLight.color.setHex(theme.lightColor);
           }
-          for (let b of this.bubbles) {
-            b.material.color.setHex(theme.bubbleColor);
+          if (this.bubbles) {
+            for (let b of this.bubbles) {
+              b.material.color.setHex(theme.bubbleColor);
+            }
           }
         }
 
@@ -478,11 +483,16 @@
           const delta = xb.getDeltaTime ? xb.getDeltaTime() : 0.016;
           const time = performance.now() * 0.001;
 
-          for (let b of this.bubbles) {
-            b.position.y += Math.sin(time * b.userData.wobbleSpeed + b.userData.wobbleOffset) * 0.003 * this.bubbleSpeedMultiplier;
-            b.position.x += Math.cos(time * 0.5 + b.userData.wobbleOffset) * 0.001;
-            if (b.position.y > 3.8) {
-              b.position.y = 0.2;
+          if (this.bubblesActive && this.bubbles) {
+            for (let b of this.bubbles) {
+              b.userData.baseY += 0.0025 * this.bubbleSpeedMultiplier;
+              if (b.userData.baseY > 3.8) {
+                b.userData.baseY = 0.2;
+                b.position.x = (Math.random() - 0.5) * 8.0;
+                b.position.z = (Math.random() - 0.5) * 8.0;
+              }
+              b.position.y = b.userData.baseY + Math.sin(time * b.userData.wobbleSpeed + b.userData.wobbleOffset) * 0.15;
+              b.position.x += Math.cos(time * 0.4 + b.userData.wobbleOffset) * 0.001;
             }
           }
 
@@ -506,6 +516,16 @@
           }
           if (this.keys.arrowRight || this.keys.e) {
             cam.rotation.y -= turnSpeed;
+          }
+
+          for (const controller of xb.core.input.controllers) {
+            const axes = controller.inputSource?.gamepad?.axes;
+            if (axes && axes.length >= 4) {
+              const thumbstickX = axes[2];
+              if (Math.abs(thumbstickX) > 0.2) {
+                cam.rotation.y -= thumbstickX * turnSpeed * 1.5;
+              }
+            }
           }
 
           const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), cam.rotation.y);
