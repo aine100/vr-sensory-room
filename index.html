@@ -53,6 +53,7 @@
           this.currentThemeIndex = 0;
           this.bubbleSpeedMultiplier = 1.0;
           this.lightIntensity = 2.0;
+          this.bubblesActive = true;
           this._taylorPlaying = false;
 
           // Expanded color themes for rich environmental mood selection
@@ -242,7 +243,7 @@
           cushion3.castShadow = true;
           this.add(cushion3);
 
-          // Taylor Swift Poster using uploaded asset
+          // Taylor Swift Poster using taylor1.jpg
           const posterGeo = new THREE.PlaneGeometry(1.5, 2.1);
           const posterMat = new THREE.MeshStandardMaterial({ roughness: 0.2 });
           const posterMesh = new THREE.Mesh(posterGeo, posterMat);
@@ -252,7 +253,7 @@
           this.add(posterMesh);
 
           const textureLoader = new THREE.TextureLoader();
-          textureLoader.load('taylor1.avif', (tex) => {
+          textureLoader.load('taylor1.jpg', (tex) => {
             posterMat.map = tex;
             posterMat.needsUpdate = true;
           });
@@ -334,8 +335,31 @@
         }
 
         createWallControlAndSwitches() {
-          const switchGeo = new THREE.PlaneGeometry(0.7, 0.7);
+          const switchGeo = new THREE.PlaneGeometry(0.55, 0.7);
           
+          // Bubbles Toggle Switch (On/Off)
+          const canvasToggle = document.createElement('canvas');
+          canvasToggle.width = 256;
+          canvasToggle.height = 256;
+          const ctxToggle = canvasToggle.getContext('2d');
+          ctxToggle.fillStyle = '#1e293b';
+          ctxToggle.fillRect(0, 0, 256, 256);
+          ctxToggle.fillStyle = '#10b981';
+          ctxToggle.beginPath();
+          ctxToggle.arc(128, 110, 50, 0, Math.PI * 2);
+          ctxToggle.fill();
+          ctxToggle.fillStyle = '#ffffff';
+          ctxToggle.font = 'bold 20px Inter, sans-serif';
+          ctxToggle.textAlign = 'center';
+          ctxToggle.fillText('🫧 ON/OFF', 128, 205);
+
+          const textureToggle = new THREE.CanvasTexture(canvasToggle);
+          const matToggle = new THREE.MeshStandardMaterial({ map: textureToggle, roughness: 0.2 });
+          const meshToggle = new THREE.Mesh(switchGeo, matToggle);
+          meshToggle.position.set(-1.1, 2.2, -4.95);
+          meshToggle.userData = { action: 'toggle_bubbles' };
+          this.add(meshToggle);
+
           // Bubble Speed Switch
           const canvasBubble = document.createElement('canvas');
           canvasBubble.width = 256;
@@ -355,7 +379,7 @@
           const textureBubble = new THREE.CanvasTexture(canvasBubble);
           const matBubble = new THREE.MeshStandardMaterial({ map: textureBubble, roughness: 0.2 });
           const meshBubble = new THREE.Mesh(switchGeo, matBubble);
-          meshBubble.position.set(-0.6, 2.2, -4.95);
+          meshBubble.position.set(-0.4, 2.2, -4.95);
           meshBubble.userData = { action: 'speed' };
           this.add(meshBubble);
 
@@ -378,7 +402,7 @@
           const textureLight = new THREE.CanvasTexture(canvasLight);
           const matLight = new THREE.MeshStandardMaterial({ map: textureLight, roughness: 0.2 });
           const meshLight = new THREE.Mesh(switchGeo, matLight);
-          meshLight.position.set(0.2, 2.2, -4.95);
+          meshLight.position.set(0.3, 2.2, -4.95);
           meshLight.userData = { action: 'light' };
           this.add(meshLight);
 
@@ -434,9 +458,16 @@
           const tTexture = new THREE.CanvasTexture(tCanvas);
           const tMat = new THREE.MeshStandardMaterial({ map: tTexture, roughness: 0.3 });
           const tMesh = new THREE.Mesh(themePanelGeo, tMat);
-          tMesh.position.set(0.6, 1.35, -4.95);
+          tMesh.position.set(0.3, 1.35, -4.95);
           tMesh.userData = { action: 'theme_panel' };
           this.add(tMesh);
+        }
+
+        toggleBubbles() {
+          this.bubblesActive = !this.bubblesActive;
+          if (this.bubbleParticles) {
+            this.bubbleParticles.visible = this.bubblesActive;
+          }
         }
 
         setTheme(index) {
@@ -481,6 +512,7 @@
           for (const sw of switches) {
             const intersection = xb.core.user.select(sw, controller);
             if (intersection) {
+              if (sw.userData.action === 'toggle_bubbles') this.toggleBubbles();
               if (sw.userData.action === 'speed') this.cycleBubbleSpeed();
               if (sw.userData.action === 'light') this.cycleLightIntensity();
               if (sw.userData.action === 'theme') this.cycleTheme();
@@ -536,7 +568,7 @@
         }
 
         update() {
-          if (this.bubbleParticles && this.bubbleData) {
+          if (this.bubbleParticles && this.bubbleData && this.bubblesActive) {
             const time = performance.now() * 0.001;
             const dummy = new THREE.Object3D();
             
