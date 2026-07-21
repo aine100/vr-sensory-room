@@ -275,37 +275,37 @@
         createWallSpotifyPlayer() {
           this.spotifyPanel = new xb.SpatialPanel({
             width: 1.8,
-            height: 1.2,
-            backgroundColor: '#0f172afc'
+            height: 1.3,
+            backgroundColor: '#121212f8'
           });
           this.spotifyPanel.position.set(0.0, 2.0, -4.9);
           this.add(this.spotifyPanel);
 
           const grid = this.spotifyPanel.addGrid();
           
-          const headerRow = grid.addRow({ weight: 0.2 });
-          headerRow.addText({ text: "🎵 Spotify - Midnights (Til Dawn Edition)", fontColor: '#38bdf8', fontSize: 0.06 });
+          const headerRow = grid.addRow({ weight: 0.18 });
+          headerRow.addText({ text: "🟢 Spotify · Midnights (Til Dawn Edition)", fontColor: '#1db954', fontSize: 0.055 });
 
-          const trackRow = grid.addRow({ weight: 0.3 });
-          this.trackLabel = trackRow.addText({
+          const infoRow = grid.addRow({ weight: 0.32 });
+          this.trackLabel = infoRow.addText({
             text: "Now Playing: Anti-Hero (Taylor Swift)",
             fontColor: '#ffffff',
-            fontSize: 0.05
+            fontSize: 0.048
           });
 
-          const statusRow = grid.addRow({ weight: 0.2 });
+          const statusRow = grid.addRow({ weight: 0.18 });
           this.statusDisplay = statusRow.addText({
             text: "⏸ (Click TV to Play Audio)",
-            fontColor: '#94a3b8',
-            fontSize: 0.045
+            fontColor: '#b3b3b3',
+            fontSize: 0.042
           });
 
-          const footerRow = grid.addRow({ weight: 0.3 });
+          const footerRow = grid.addRow({ weight: 0.32 });
           const playBtn = footerRow.addCol({ weight: 1.0 }).addTextButton({
-            text: "▶ Play / Pause Ambient Soundscape",
-            backgroundColor: '#0284c7',
+            text: "▶ Toggle Ambient Soundscape",
+            backgroundColor: '#1db954',
             fontColor: '#ffffff',
-            fontSize: 0.15
+            fontSize: 0.14
           });
           playBtn.onTriggered = () => {
             this.toggleAudio();
@@ -408,12 +408,41 @@
           base.position.y = 0.06;
           this.lavaGroup.add(base);
 
-          const glassMat = new THREE.MeshPhysicalMaterial({ color: 0xf43f5e, transmission: 0.6, transparent: true, opacity: 0.8 });
+          const glassMat = new THREE.MeshPhysicalMaterial({ 
+            color: 0xf43f5e, 
+            transmission: 0.7, 
+            transparent: true, 
+            opacity: 0.7,
+            roughness: 0.1,
+            ior: 1.5
+          });
           const glass = new THREE.Mesh(glassGeo, glassMat);
           glass.position.y = 0.3;
           this.lavaGroup.add(glass);
 
-          this.lavaLight = new THREE.PointLight(0xf43f5e, 2.0, 5);
+          // Animated lava blobs inside
+          this.lavaBlobs = [];
+          const blobGeo = new THREE.SphereGeometry(0.032, 16, 16);
+          const blobMat = new THREE.MeshStandardMaterial({ 
+            color: 0xff70a6, 
+            emissive: 0xff2070, 
+            emissiveIntensity: 0.7,
+            roughness: 0.2 
+          });
+
+          for (let i = 0; i < 3; i++) {
+            const blob = new THREE.Mesh(blobGeo, blobMat);
+            blob.position.set(0, 0.15 + i * 0.09, 0);
+            blob.userData = {
+              baseY: 0.15 + i * 0.09,
+              speed: 1.2 + i * 0.5,
+              offset: i * 1.8
+            };
+            this.lavaGroup.add(blob);
+            this.lavaBlobs.push(blob);
+          }
+
+          this.lavaLight = new THREE.PointLight(0xff477e, 2.5, 4);
           this.lavaLight.position.y = 0.3;
           this.lavaGroup.add(this.lavaLight);
           this.lampLightList.push(this.lavaLight);
@@ -493,6 +522,18 @@
               }
               b.position.y = b.userData.baseY + Math.sin(time * b.userData.wobbleSpeed + b.userData.wobbleOffset) * 0.15;
               b.position.x += Math.cos(time * 0.4 + b.userData.wobbleOffset) * 0.001;
+            }
+          }
+
+          if (this.lavaBlobs) {
+            this.lavaBlobs.forEach((blob) => {
+              const yOffset = Math.sin(time * blob.userData.speed + blob.userData.offset) * 0.09;
+              blob.position.y = blob.userData.baseY + yOffset;
+              const scale = 1.0 + Math.cos(time * blob.userData.speed * 1.5) * 0.25;
+              blob.scale.setScalar(scale);
+            });
+            if (this.lavaLight) {
+              this.lavaLight.intensity = 2.2 + Math.sin(time * 3) * 0.8;
             }
           }
 
