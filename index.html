@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <title>Customizable VR Sensory Room with Spotify & YouTube Music</title>
+    <title>VR Sensory Room for Teenagers with Autism</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
     <link type="text/css" rel="stylesheet" href="https://xrblocks.github.io/css/xr.css" />
     <script>
@@ -28,8 +28,27 @@
         }
       }
     </script>
+    <style>
+      #spotify-container {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 320px;
+        height: 152px;
+        z-index: 9999;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        background: #121212;
+      }
+    </style>
   </head>
   <body>
+    <!-- Embedded Spotify Web Player Iframe for custom music selection -->
+    <div id="spotify-container">
+      <iframe src="https://open.spotify.com/embed/playlist/37i9dQZF1DX8Uebhn9wzrS?utm_source=generator&theme=0" width="100%" height="152" frameborder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
+    </div>
+
     <script type="module">
       import * as uikit from '@pmndrs/uikit';
       import * as THREE from 'three';
@@ -37,14 +56,12 @@
         UICore,
         UIPanel,
         UIText,
-        UIImage,
-        UIIcon,
         ManipulationBehavior,
         raycastSortFunction,
       } from 'uiblocks';
       import * as xb from 'xrblocks';
 
-      class MultiPlatformSensoryRoomScript extends xb.Script {
+      class SensoryRoomScript extends xb.Script {
         constructor() {
           super();
           this.uiCore = new UICore(this);
@@ -57,9 +74,6 @@
           this.lightIntensity = 2.0;
           this.isBreathingActive = false;
           this.breathingPhase = 0;
-          this.isMusicPlaying = false;
-          this.sound = null;
-          this.audioListener = null;
 
           this.themes = [
             { name: 'Ocean Calm', color: 0x1a365d, lightColor: 0x63b3ed, bubbleColor: 0x4299e1 },
@@ -67,14 +81,6 @@
             { name: 'Lavender Dreams', color: 0x322659, lightColor: 0xb794f4, bubbleColor: 0x9f7aea },
             { name: 'Warm Sunset', color: 0x4a2810, lightColor: 0xf6ad55, bubbleColor: 0xed8936 }
           ];
-
-          this.playlists = [
-            { source: 'Spotify', title: 'Spotify: Ambient Sleep', url: 'https://cdn.jsdelivr.net/gh/xrblocks/assets@main/demos/rain/rain.opus' },
-            { source: 'Spotify', title: 'Spotify: Lofi Beats', url: 'https://actions.google.com/sounds/v1/ambiences/rain_heavy.ogg' },
-            { source: 'YouTube Music', title: 'YT Music: Calm Piano', url: 'https://actions.google.com/sounds/v1/ambiences/outdoor_rain.ogg' },
-            { source: 'YouTube Music', title: 'YT Music: White Noise Waves', url: 'https://cdn.jsdelivr.net/gh/xrblocks/assets@main/demos/rain/rain.opus' }
-          ];
-          this.currentPlaylistIndex = 0;
         }
 
         async init() {
@@ -89,33 +95,51 @@
           this.directionalLight.position.set(0, 5, 2);
           this.add(this.directionalLight);
 
+          // Build Enclosed 3D Room Environment
+          this.createRoomEnvironment();
+
+          this.createSensoryBubbles();
+          this.createControlPanel();
+        }
+
+        createRoomEnvironment() {
+          // Room Walls & Ceiling (Inverted Sphere)
           const roomGeometry = new THREE.SphereGeometry(8, 32, 32);
-          const roomMaterial = new THREE.MeshBasicMaterial({
+          const roomMaterial = new THREE.MeshStandardMaterial({
             color: 0x1a365d,
-            side: THREE.BackSide
+            side: THREE.BackSide,
+            roughness: 0.9,
+            metalness: 0.1
           });
           this.roomMesh = new THREE.Mesh(roomGeometry, roomMaterial);
           this.add(this.roomMesh);
 
-          this.createSensoryBubbles();
-          this.createControlPanel();
-          this.setupAudio();
-        }
-
-        setupAudio() {
-          this.audioListener = new THREE.AudioListener();
-          xb.core.camera.add(this.audioListener);
-
-          this.sound = new THREE.Audio(this.audioListener);
-          const audioLoader = new THREE.AudioLoader();
-          
-          audioLoader.load(this.playlists[0].url, (buffer) => {
-            this.sound.setBuffer(buffer);
-            this.sound.setLoop(true);
-            this.sound.setVolume(0.5);
-          }, undefined, (err) => {
-            console.warn('Audio stream fallback loader encountered an issue:', err);
+          // Room Floor
+          const floorGeometry = new THREE.PlaneGeometry(16, 16);
+          const floorMaterial = new THREE.MeshStandardMaterial({
+            color: 0x0f172a,
+            roughness: 0.8
           });
+          const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+          floor.rotation.x = -Math.PI / 2;
+          floor.position.y = 0;
+          this.add(floor);
+
+          // Cozy Sensory Seating Cushions
+          const cushionGeo = new THREE.BoxGeometry(0.8, 0.3, 0.8);
+          const cushionMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.7 });
+          
+          const cushion1 = new THREE.Mesh(cushionGeo, cushionMat);
+          cushion1.position.set(-1.2, 0.15, -1.8);
+          this.add(cushion1);
+
+          const cushion2 = new THREE.Mesh(cushionGeo, cushionMat);
+          cushion2.position.set(1.2, 0.15, -1.8);
+          this.add(cushion2);
+
+          const cushion3 = new THREE.Mesh(cushionGeo, cushionMat);
+          cushion3.position.set(0, 0.15, -2.6);
+          this.add(cushion3);
         }
 
         createSensoryBubbles() {
@@ -158,8 +182,8 @@
         createControlPanel() {
           const card = this.uiCore.createCard({
             name: 'SensoryControlCard',
-            sizeX: 1.4,
-            sizeY: 1.35,
+            sizeX: 1.5,
+            sizeY: 1.45,
             position: new THREE.Vector3(0, 1.4, -1.6),
             behaviors: [
               new ManipulationBehavior({
@@ -173,25 +197,25 @@
           const panel = new UIPanel({
             width: '100%',
             height: '100%',
-            fillColor: 'rgba(15, 23, 42, 0.94)',
+            fillColor: 'rgba(15, 23, 42, 0.95)',
             cornerRadius: 40,
-            padding: 25,
+            padding: 30,
             flexDirection: 'column',
             justifyContent: 'space-between',
             alignItems: 'center',
           });
           card.add(panel);
 
-          const title = new UIText('Sensory Sanctuary & Music', {
-            fontSize: 38,
+          const title = new UIText('Sensory Room Sanctuary', {
+            fontSize: 42,
             fontWeight: 'bold',
             color: '#e2e8f0',
             textAlign: 'center'
           });
           panel.add(title);
 
-          const subtitle = new UIText('Themes, Custom Speed, Spotify & YouTube Music', {
-            fontSize: 20,
+          const subtitle = new UIText('Custom Themes, Bubble Speed & Spotify Music', {
+            fontSize: 22,
             color: '#94a3b8',
             textAlign: 'center'
           });
@@ -199,7 +223,7 @@
 
           const themeRow = new UIPanel({
             flexDirection: 'row',
-            gap: 12,
+            gap: 16,
             width: '100%',
             justifyContent: 'center',
             alignItems: 'center',
@@ -207,9 +231,9 @@
 
           const createButton = (label, onClickCb, bg = '#334155') => {
             const button = new UIPanel({
-              width: 195,
-              height: 60,
-              cornerRadius: 20,
+              width: 210,
+              height: 70,
+              cornerRadius: 22,
               fillColor: bg,
               justifyContent: 'center',
               alignItems: 'center',
@@ -219,7 +243,7 @@
             });
 
             const btnText = new UIText(label, {
-              fontSize: 24,
+              fontSize: 26,
               color: '#ffffff',
               textAlign: 'center'
             });
@@ -227,45 +251,33 @@
             return button;
           };
 
-          themeRow.add(createButton('🌊 Ocean', () => this.setTheme(0)));
-          themeRow.add(createButton('🌲 Forest', () => this.setTheme(1)));
+          themeRow.add(createButton('🌊 Ocean Calm', () => this.setTheme(0)));
+          themeRow.add(createButton('🌲 Forest Serenity', () => this.setTheme(1)));
           panel.add(themeRow);
 
           const themeRow2 = new UIPanel({
             flexDirection: 'row',
-            gap: 12,
+            gap: 16,
             width: '100%',
             justifyContent: 'center',
             alignItems: 'center',
           });
           themeRow2.add(createButton('💜 Lavender', () => this.setTheme(2)));
-          themeRow2.add(createButton('🌅 Sunset', () => this.setTheme(3)));
+          themeRow2.add(createButton('🌅 Sunset Glow', () => this.setTheme(3)));
           panel.add(themeRow2);
 
           const customRow = new UIPanel({
             flexDirection: 'row',
-            gap: 12,
+            gap: 16,
             width: '100%',
             justifyContent: 'center',
             alignItems: 'center',
           });
 
-          customRow.add(createButton('🫧 Speed', () => this.cycleBubbleSpeed(), '#1e293b'));
-          customRow.add(createButton('💡 Light', () => this.cycleLightIntensity(), '#1e293b'));
-          customRow.add(createButton('🧘 Breathe', () => this.toggleBreathingGuide(), '#047857'));
+          customRow.add(createButton('🫧 Bubble Speed', () => this.cycleBubbleSpeed(), '#1e293b'));
+          customRow.add(createButton('💡 Light Bright', () => this.cycleLightIntensity(), '#1e293b'));
+          customRow.add(createButton('🧘 Breathe Guide', () => this.toggleBreathingGuide(), '#047857'));
           panel.add(customRow);
-
-          const musicRow = new UIPanel({
-            flexDirection: 'row',
-            gap: 12,
-            width: '100%',
-            justifyContent: 'center',
-            alignItems: 'center',
-          });
-
-          musicRow.add(createButton('🎵 Play/Pause', () => this.toggleMusic(), '#1db954'));
-          musicRow.add(createButton('▶ YT / Spot Next', () => this.nextMusicTrack(), '#ff0000'));
-          panel.add(musicRow);
         }
 
         setTheme(index) {
@@ -306,41 +318,6 @@
           }
         }
 
-        toggleMusic() {
-          if (this.audioListener.context.state === 'suspended') {
-            this.audioListener.context.resume();
-          }
-
-          if (this.isMusicPlaying) {
-            if (this.sound.isPlaying) this.sound.pause();
-            this.isMusicPlaying = false;
-          } else {
-            if (!this.sound.isPlaying && this.sound.buffer) {
-              this.sound.play();
-            }
-            this.isMusicPlaying = true;
-          }
-        }
-
-        nextMusicTrack() {
-          this.currentPlaylistIndex = (this.currentPlaylistIndex + 1) % this.playlists.length;
-          const playlist = this.playlists[this.currentPlaylistIndex];
-          console.log(`Switching to: ${playlist.title}`);
-          
-          if (this.sound.isPlaying) {
-            this.sound.stop();
-          }
-
-          const audioLoader = new THREE.AudioLoader();
-          audioLoader.load(playlist.url, (buffer) => {
-            this.sound.setBuffer(buffer);
-            this.sound.setLoop(true);
-            if (this.isMusicPlaying) {
-              this.sound.play();
-            }
-          });
-        }
-
         update() {
           if (this.isBreathingActive) {
             this.breathingPhase += 0.015;
@@ -373,8 +350,8 @@
         const options = new xb.Options();
         options.enableUI();
         options.uikit.enable(uikit);
-        options.setAppTitle('Customizable VR Sensory Room with Spotify & YouTube Music');
-        xb.add(new MultiPlatformSensoryRoomScript());
+        options.setAppTitle('VR Sensory Room for Teenagers with Autism');
+        xb.add(new SensoryRoomScript());
         xb.init(options);
       });
     </script>
