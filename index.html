@@ -291,7 +291,7 @@
           rightArm.castShadow = true;
           this.couchGroup.add(rightArm);
 
-          // Position against the back wall, facing forward
+          // Position safely inside the room against the back wall, facing forward
           this.couchGroup.position.set(0, 0.01, 3.5);
           this.couchGroup.rotation.y = Math.PI; // Face front
           
@@ -313,27 +313,32 @@
               renderer: xb.core.renderer,
             });
 
-            // Automatically calculate size and adjust it to exactly 1.7 meters wide (Increased size slightly)
+            // Ensure matrices are updated before calculating the bounding box
+            sofa.updateMatrixWorld(true);
+
+            // Automatically calculate size and adjust it to exactly 1.7 meters wide
             const box = new THREE.Box3().setFromObject(sofa);
             const size = box.getSize(new THREE.Vector3());
             const targetWidth = 1.7;
             if (size.x > 0) {
               const scaleFactor = targetWidth / size.x;
               sofa.scale.setScalar(scaleFactor);
+              sofa.updateMatrixWorld(true);
             }
 
             // Recalculate box after scaling to find exact floor center
             const newBox = new THREE.Box3().setFromObject(sofa);
             const center = newBox.getCenter(new THREE.Vector3());
             
-            // Center it on X and Z, place lowest point on floor
-            sofa.position.sub(center); 
-            sofa.position.y += (sofa.position.y - newBox.min.y) + 0.01;
+            // Center it on X and Z, place lowest point perfectly on the floor
+            sofa.position.x -= center.x;
+            sofa.position.z -= center.z;
+            sofa.position.y -= newBox.min.y;
             
-            // Move into position
+            // Move back into the previous correct location inside the room
             const finalCouchGroup = new THREE.Group();
             finalCouchGroup.add(sofa);
-            finalCouchGroup.position.set(0, 0, 3.5);
+            finalCouchGroup.position.set(0, 0.01, 3.5);
             finalCouchGroup.rotation.y = Math.PI; // face front
 
             // Swap fallback with real model
